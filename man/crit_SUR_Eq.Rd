@@ -5,7 +5,8 @@
 \title{SUR criterion for equilibria}
 \usage{
 crit_SUR_Eq(idx, model, integcontrol, Simu, precalc.data = NULL, equilibrium,
-  n.ynew = NULL, cross = FALSE, IS = FALSE, plot = FALSE)
+  n.ynew = NULL, cross = FALSE, IS = FALSE, plot = FALSE,
+  kweights = NULL, Nadir = NULL)
 }
 \arguments{
 \item{idx}{is the index on the grid of the strategy evaluated}
@@ -23,7 +24,7 @@ first all the trajectories for obj1, then obj2, etc.)}
 \item{precalc.data}{is a list of length \code{nobj} of precalculated data (based on kriging models at integration points)
 for faster computation - computed if not provided}
 
-\item{equilibrium}{equilibrium type: either "\code{NE}", "\code{KSE}" or "\code{NKSE}"}
+\item{equilibrium}{equilibrium type: either "\code{NE}", "\code{KSE}", "\code{CKSE}" or "\code{NKSE}"}
 
 \item{n.ynew}{is the number of \code{ynew} simulations (if not provided, equal to the number of trajectories)}
 
@@ -32,6 +33,11 @@ for faster computation - computed if not provided}
 \item{IS}{if \code{TRUE}, importance sampling is used for ynew}
 
 \item{plot}{if \code{TRUE}, draws equilibria samples (should always be turned off)}
+
+\item{kweights}{kriging weights for \code{CKS} (TESTING)}
+
+\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined,
+the other coordinates can be set to \code{Inf}.}
 }
 \description{
 Computes the SUR criterion associated to an equilibrium for a given \code{xnew} and a set of trajectories of objective functions
@@ -104,4 +110,3 @@ V. Picheny, M. Binois, A. Habbal (2016+), A Bayesian optimization approach to fi
 \seealso{
 \code{\link[GPGame]{crit_PNash}} for an alternative infill criterion
 }
-

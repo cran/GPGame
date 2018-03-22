@@ -6,7 +6,8 @@
 \usage{
 filter_for_Game(n.s.target, model = NULL, predictions = NULL,
   type = "window", equilibrium = "NE", integcontrol, options = NULL,
-  ncores = 1, random = TRUE, include.obs = FALSE, min.crit = 1e-12)
+  ncores = 1, random = TRUE, include.obs = FALSE, min.crit = 1e-12,
+  nsamp = NULL, Nadir = NULL)
 }
 \arguments{
 \item{n.s.target}{scalar or vector of number of strategies (one value per player) to select. For \code{NE}, if \code{n.s.target} is a scalar
@@ -35,6 +36,11 @@ otherwise the points are chosen by random sampling with weights proportional to 
 \item{include.obs}{Boolean. If \code{TRUE}, the observations are included to the filtered set.}
 
 \item{min.crit}{Minimal value for the criterion, useful if \code{random = TRUE}.}
+
+\item{nsamp}{number of samples to estimate the probability of non-domination, useful when \code{type=PND} and \code{nobj}>3.}
+
+\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+the other coordinates can be set to \code{Inf}.}
 }
 \value{
 List with two elements: \code{I} indices selected and \code{crit} the filter metric at all candidate points
@@ -48,4 +54,3 @@ or based on the probability that the response belongs to \code{option$window}.
 The other options, "\code{PND}" (probability of non-domination, i.e., of not being dominated by the current Pareto front)
 and "\code{Pnash}" (probability of realizing a Nash equilibrium) base the ranking of points on the associated probability.
 }
-

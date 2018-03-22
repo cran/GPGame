@@ -6,7 +6,7 @@
 \usage{
 solve_game(fun, ..., equilibrium = "NE", crit = "sur", model = NULL,
   n.init = NULL, n.ite, d, nobj, x.to.obj = NULL, noise.var = NULL,
-  integcontrol = NULL, simucontrol = NULL, plotcontrol = NULL,
+  Nadir = NULL, integcontrol = NULL, simucontrol = NULL,
   filtercontrol = NULL, kmcontrol = NULL, returncontrol = NULL,
   ncores = 1, trace = 1, seed = NULL)
 }
@@ -15,7 +15,8 @@ solve_game(fun, ..., equilibrium = "NE", crit = "sur", model = NULL,
 
 \item{...}{additional parameter to be passed to \code{fun}}
 
-\item{equilibrium}{either '\code{NE}', '\code{KSE}' or '\code{NKSE}' for Nash/Kalai-Smoridinsky/Nash-Kalai-Smoridinsky equilibria}
+\item{equilibrium}{either '\code{NE}', '\code{KSE}', '\code{CKSE}' or '\code{NKSE}' for Nash / Kalai-Smorodinsky / Copula-Kalai-Smorodinsky
+/ Nash-Kalai-Smorodinsky equilibria}
 
 \item{crit}{'\code{sur}' (default) is available for all equilibria, '\code{psim}' and '\code{pex}' are available for Nash}
 
@@ -35,11 +36,12 @@ solve_game(fun, ..., equilibrium = "NE", crit = "sur", model = NULL,
 a function (type closure) with vectorial output (variable noise, different for each objective) or \code{"given_by_fn"}, see Details.
 If not provided, \code{noise.var} is taken as the average of \code{model@noise.var}.}
 
+\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+the other coordinates can be set to \code{Inf}.}
+
 \item{integcontrol}{optional list for handling integration points. See Details.}
 
 \item{simucontrol}{optional list for handling conditional simulations. See Details.}
-
-\item{plotcontrol}{optional list for handling during-optimization plots. See Details.}
 
 \item{filtercontrol}{optional list for handling filters. See Details.}
 
@@ -60,8 +62,10 @@ A list with components:
 \item{\code{Jplus}}{: recorded values of the acquisition function maximizer}
 \item{\code{integ.pts} and  \code{expanded.indices}}{: the discrete space used,}
 \item{\code{predEq}}{: a list containing the recorded values of the estimated best solution,}
-\item{\code{Eq.design, Eq.poff}}{: estimated equilibrium and corresponding pay-off (if \code{return.Eq==TRUE})}
+\item{\code{Eq.design, Eq.poff}}{: estimated equilibrium and corresponding pay-off}
 }
+
+Note: with CKSE, kweights are not used when the mean on integ.pts is used
 }
 \description{
 Main function to solve games.
@@ -76,40 +80,41 @@ If \code{n.s} is a scalar, it corresponds to the total number of strategies (to 
 otherwise it corresponds to the nb of strategies per player. In addition, one may choose the type of discretization with \code{gridtype}.
 Options are '\code{lhs}' or '\code{cartesian}'. Finally, \code{lb} and \code{ub} are vectors specifying the bounds for the design variables.
 By default the design space is \code{[0,1]^d}.
+A \code{renew} slot is available, if \code{TRUE}, then \code{integ.pts} are changed at each iteration. Available only for \code{KSE} and \code{CKSE}.
+For \code{CKSE}, setting the slot \code{kweights=TRUE} allows to increase the number of integration points, with \code{nsamp} 
+(default to \code{1e4}) virtual simulation points.
 
 \code{simucontrol} controls options on conditional GP simulations. Options are \code{IS}: if \code{TRUE}, importance sampling is used for \code{ynew};
 \code{n.ynew} number of samples of \code{Y(x_{n+1})} and \code{n.sim} number of sample path generated.
-
-\code{plotcontrol} can be used to generate plots during the search. Options are \code{plots} (Boolean, \code{FALSE} by default), \code{compute.actual}
-(Boolean, \code{FALSE} by default, to draw the actual problem, only for inexpensive \code{fun}), and \code{pbname} (string, for figure title and pdf export).
 
 \code{filtercontrol} controls filtering options. \code{filter} sets how to select a subset of simulation and candidate points,
 either either a single value or a vector of two to use different filters for simulation and candidate points.
 Possible values are '\code{window}', '\code{Pnash}' (for \code{NE}), '\code{PND}' (probability of non domination), '\code{none}'.
 \code{nsimPoints} and \code{ncandPoints} set the maximum number of simulation/candidate points wanted
 (use with filter '\code{Pnash}' for now). Default values are \code{800} and \code{200}, resp.
-\code{randomFilter} (\code{TRUE} by default) sets whereas the filter acts randomly or deterministically.
+\code{randomFilter} (\code{TRUE} by default except for filter \code{window}) sets whereas the filter acts randomly or deterministically.
+For more than 3 objectives, \code{PND} is estimated by sampling; the number of samples is controled by \code{nsamp} (default to \code{max(20, 5 * nobj)}).
 
 \code{kmcontrol} Options for handling \code{nobj} \code{\link[DiceKriging]{km}} models.
 \code{cov.reestim} (Boolean, \code{TRUE} by default) specifies if the kriging hyperparameters
 should be re-estimated at each iteration,
 
 \code{returncontrol} sets options for the last iterations and what is returned by the algorithm.
-\code{return.Eq} (Boolean, \code{TRUE} by default) specifies
-if a final search for the equilibrium is performed at the end. \code{finalcrit} sets a different criterion for the last iteration.
 \code{track.Eq} allows to estimate the equilibrium at each iteration; options are '\code{none}' to do nothing,
 "\code{mean}" (default) to compute the equilibrium of the prediction mean (all candidates),
  "\code{empirical}" (for \code{KSE}) and "\code{pex}"/"\code{psim}" (\code{NE} only)
 for using \code{Pnash} estimate (along with mean estimate, on integ.pts only, NOT reestimated if \code{filter.simu} or \code{crit} is \code{Pnash}).
+The boolean \code{force.exploit.last} (default to \code{TRUE}) allows to evaluate the equilibrium on the predictive mean - if not already evaluated -
+instead of using \code{crit} (i.e., \code{sur}) for \code{KSE} and \code{CKSE}.
 }
 \examples{
 \dontrun{
 
-##############################################
-# Example 1: 2 variables, 2 players, no filter
-##############################################
+################################################################
+# Example 1: Nash equilibrium, 2 variables, 2 players, no filter
+################################################################
 # Define objective function (R^2 -> R^2)
-fun <- function (x)
+fun1 <- function (x)
 {
   if (is.null(dim(x)))    x <- matrix(x, nrow = 1)
   b1 <- 15 * x[, 1] - 5
@@ -121,7 +126,7 @@ fun <- function (x)
 
 # To use parallel computation (turn off on Windows)
 library(parallel)
-parallel <- FALSE #TRUE # 
+parallel <- FALSE #TRUE #
 if(parallel) ncores <- detectCores() else ncores <- 1
 
 # Simple configuration: no filter, discretization is a 21x21 grid
@@ -133,7 +138,7 @@ gridtype <- 'cartesian'
 
 # Run solver with 6 initial points, 4 iterations
 # Increase n.ite to at least 10 for better results
-res <- solve_game(fun, equilibrium = "NE", crit = "sur", n.init=6, n.ite=4,
+res <- solve_game(fun1, equilibrium = "NE", crit = "sur", n.init=6, n.ite=4,
                   d = 2, nobj=2, x.to.obj = x.to.obj,
                   integcontrol=list(n.s=n.s, gridtype=gridtype),
                   ncores = ncores, trace=1, seed=1)
@@ -145,10 +150,27 @@ Poff <- res$Eq.poff
 # Draw results
 plotGame(res)
 
-##############################################
-# Example 2: 4 variables, 2 players, filtering
-##############################################
-fun <- function(x, nobj = 2){
+################################################################
+# Example 2: same example, KS equilibrium with given Nadir
+################################################################
+# Run solver with 6 initial points, 4 iterations
+# Increase n.ite to at least 10 for better results
+res <- solve_game(fun1, equilibrium = "KSE", crit = "sur", n.init=6, n.ite=4,
+                  d = 2, nobj=2, x.to.obj = x.to.obj,
+                  integcontrol=list(n.s=400, gridtype="lhs"),
+                  ncores = ncores, trace=1, seed=1, Nadir=c(Inf, -20))
+
+# Get estimated equilibrium and corresponding pay-off
+NE <- res$Eq.design
+Poff <- res$Eq.poff
+
+# Draw results
+plotGame(res, equilibrium = "KSE", Nadir=c(Inf, -20))
+
+################################################################
+# Example 3: Nash equilibrium, 4 variables, 2 players, filtering
+################################################################
+fun2 <- function(x, nobj = 2){
   if (is.null(dim(x)))     x <- matrix(x, 1)
   y <- matrix(x[, 1:(nobj - 1)], nrow(x))
   z <- matrix(x[, nobj:ncol(x)], nrow(x))
@@ -176,7 +198,7 @@ kmcontrol <- list(lb=rep(.2,4), model.trend=~1, covtype="matern3_2")
 
 # Run solver with 20 initial points, 4 iterations
 # Increase n.ite to at least 20 for better results
-res <- solve_game(fun, equilibrium = "NE", crit = "psim", n.init=20, n.ite=2,
+res <- solve_game(fun2, equilibrium = "NE", crit = "psim", n.init=20, n.ite=2,
                   d = 4, nobj=2, x.to.obj = x.to.obj,
                   integcontrol=list(n.s=n.s, gridtype=gridtype),
                   filtercontrol=filtercontrol,
@@ -190,10 +212,31 @@ Poff <- res$Eq.poff
 # Draw results
 plotGame(res)
 
+################################################################
+# Example 4: same example, KS equilibrium
+################################################################
+
+# Grid definition: simple lhs
+integcontrol=list(n.s=1e4, gridtype='lhs')
+
+# Run solver with 20 initial points, 4 iterations
+# Increase n.ite to at least 20 for better results
+res <- solve_game(fun2, equilibrium = "KSE", crit = "sur", n.init=20, n.ite=2,
+                  d = 4, nobj=2,
+                  integcontrol=integcontrol,
+                  filtercontrol=filtercontrol,
+                  kmcontrol=kmcontrol,
+                  ncores = 1, trace=1, seed=1)
+
+# Get estimated equilibrium and corresponding pay-off
+NE <- res$Eq.design
+Poff <- res$Eq.poff
+
+# Draw results
+plotGame(res, equilibrium = "KSE")
 }
 }
 \references{
 V. Picheny, M. Binois, A. Habbal (2016+), A Bayesian optimization approach to find Nash equilibria,
 \emph{https://arxiv.org/abs/1611.02440}.
 }
-

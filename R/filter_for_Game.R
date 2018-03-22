@@ -17,6 +17,9 @@
 ##' otherwise the points are chosen by random sampling with weights proportional to the criterion.
 ##' @param include.obs Boolean. If \code{TRUE}, the observations are included to the filtered set.
 ##' @param min.crit Minimal value for the criterion, useful if \code{random = TRUE}.
+##' @param nsamp number of samples to estimate the probability of non-domination, useful when \code{type=PND} and \code{nobj}>3.
+##' @param Nadir optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+##' the other coordinates can be set to \code{Inf}.
 ##' @return List with two elements: \code{I} indices selected and \code{crit} the filter metric at all candidate points
 ##' @details If \code{type == "windows"}, points are ranked based on their distance to \code{option$window} (when it is a target vector),
 ##' or based on the probability that the response belongs to \code{option$window}.
@@ -25,31 +28,29 @@
 ##' @export
 filter_for_Game <- function(n.s.target, model=NULL, predictions=NULL, type="window", equilibrium="NE",
                             integcontrol, options = NULL, ncores = 1, random=TRUE, include.obs=FALSE,
-                            min.crit = 1e-12) {
-
+                            min.crit = 1e-12, nsamp = NULL, Nadir=NULL) {
+  
   expanded.indices <- integcontrol$expanded.indices
   integ.pts <- integcontrol$integ.pts
-
+  nobj <- ncol(expanded.indices)
+  if (is.null(Nadir)) Nadir <- rep(Inf, nobj)
+  
   if (is.null(options) && type=="Pnash") options <- list(method = 'simu', nsim = 100)
   if(type == "Pnash" && is.null(options$method)){
     options$method <- 'simu'
     options$nsim <- 100
   }
-  if(length(n.s.target) == 1){
-    if (equilibrium %in% c("NE", "NKSE")) {
-      nobj <- ncol(expanded.indices)
-      n.s.target <- rep(round(n.s.target^-nobj), nobj)
-    }
-  }
-
-  if (equilibrium=="KSE" && type=="Pnash") {
+  if ((length(n.s.target) == 1) && (equilibrium %in% c("NE", "NKSE")))
+    n.s.target <- rep(round(n.s.target^-nobj), nobj)
+  
+  if (equilibrium %in% c("KSE", "CKSE") && type=="Pnash") {
     cat("Pnash filter not available for KSE; switching to PND \n")
     type <- "PND"
   }
-
+  
   if (type == "PND") {
     # Proba of non-domination
-    crit <- prob.of.non.domination(model=model, integration.points=integ.pts, predictions=predictions)
+    crit <- prob.of.non.domination(model=model, integration.points=integ.pts, predictions=predictions, nsamp=nsamp)
     #---------------------------------
   } else if (type == "window") {
     crit <- rep(1, nrow(integ.pts))
@@ -68,11 +69,11 @@ filter_for_Game <- function(n.s.target, model=NULL, predictions=NULL, type="wind
     #---------------------------------
   } else if (type == "Pnash") {
     crit <- crit_PNash(idx = 1:nrow(expanded.indices), integcontrol=integcontrol, model = model,
-                      type = options$method, ncores = ncores, control = options)
+                       type = options$method, ncores = ncores, control = options)
   }
-  crit[which(is.na(crit))] <- 0
+  crit2 <- crit[which(is.na(crit))] <- 0 #crit2 useful for KSE
   crit <- pmax(crit, min.crit)
-
+  
   # More indices than needed in case of replications -> Fixed, selection is now with mat_s
   if (random) {
     if (nrow(integ.pts) < 1e5) {
@@ -83,27 +84,56 @@ filter_for_Game <- function(n.s.target, model=NULL, predictions=NULL, type="wind
   } else {
     idx <- order(crit, decreasing = TRUE)
   }
-
+  
   if (include.obs) {
-    tmp <- duplicated(rbind(integ.pts, model[[1]]@X))
-    J <- which(tmp[1:nrow(integ.pts)])
+    tmp <- duplicated(rbind(model[[1]]@X, integ.pts))
+    J <- which(tmp[model[[1]]@n + (1:nrow(integ.pts))])
     idx <- unique(c(J, idx))
   }
-
-  if (equilibrium=="KSE") {
+  
+  if (equilibrium %in% c("KSE", "CKSE") && type != "PND") {
+    #---------------------------------
+    ## Add potential minimas of each objective based on EI (utopia), and EI x Pdom (nadir)
+    IKS <- NULL # points of interest for KS (i.e., related to KS and Nadir)
+    # if (type == "PND") {
+    #   PNDom <- crit2
+    # } else {
+    if (max(Nadir) == Inf) {
+      PNDom <- prob.of.non.domination(model=model, integration.points=integ.pts, predictions=predictions, nsamp =nsamp)
+    }
+    # }
+    PFobs <- nonDom(Reduce(cbind, lapply(model, slot, "y")))
+    for (jj in 1:length(model)) {
+      discard <- which(predictions[[jj]]$sd/sqrt(model[[jj]]@covariance@sd2) < 1e-06)
+      # EI(min) on each objective (to find potential Utopia points)
+      xcr <-  (min(model[[jj]]@y) - predictions[[jj]]$mean)/predictions[[jj]]$sd
+      test <- (min(model[[jj]]@y) - predictions[[jj]]$mean)*pnorm(xcr) + predictions[[jj]]$sd * dnorm(xcr)
+      test[discard] <- NA
+      IKS <- c(IKS, which.max(test))
+      # EI(max) x Pdom on each objective (to find potential Nadir points) unless Nadir is provided
+      if (Nadir[jj] == Inf) {
+        xcr <-  -(max(PFobs[,jj]) - predictions[[jj]]$mean)/predictions[[jj]]$sd
+        test <- (-max(PFobs[,jj]) + predictions[[jj]]$mean)*pnorm(xcr) + predictions[[jj]]$sd * dnorm(xcr)
+        test[discard] <- NA
+        test <- test * PNDom
+        IKS <- c(IKS, which.max(test))
+      }
+    }
+    idx <- unique(c(IKS, idx))
+    #---------------------------------
     I <- idx[1:n.s.target]
   } else {
     mat_s <- matrix(NA, max(n.s.target), length(n.s.target))
     for(i in 1:length(n.s.target)){
       mat_s[,i] <- unique(expanded.indices[idx, i])[1:n.s.target[i]]
     }
-
+    
     I <- rep(TRUE, nrow(expanded.indices))
     for(i in 1:ncol(expanded.indices)){
       I <- I & (expanded.indices[,i] %in% mat_s[,i])
     }
     I <- which(I)
   }
-
+  
   return(list(I=I, crit=crit))
 }

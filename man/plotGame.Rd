@@ -5,7 +5,8 @@
 \title{Plot equilibrium search result (2-objectives only)}
 \usage{
 plotGame(res, equilibrium = "NE", add = FALSE, UQ_eq = TRUE,
-  simus = NULL, integcontrol = NULL, simucontrol = NULL, ncores = 1)
+  simus = NULL, integcontrol = NULL, simucontrol = NULL, Nadir = NULL,
+  ncores = 1)
 }
 \arguments{
 \item{res}{list returned by \code{\link[GPGame]{solve_game}}}
@@ -22,6 +23,9 @@ plotGame(res, equilibrium = "NE", add = FALSE, UQ_eq = TRUE,
 
 \item{simucontrol}{optional list for handling conditional simulations. See \code{\link[GPGame]{solve_game}}.}
 
+\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+the other coordinates can be set to \code{Inf}.}
+
 \item{ncores}{number of CPU available (> 1 makes mean parallel \code{TRUE})}
 }
 \description{
@@ -33,7 +37,7 @@ library(GPareto)
 library(parallel)
 
 # Turn off on Windows
-parallel <- TRUE # FALSE #
+parallel <- FALSE # TRUE
 ncores <- 1
 if(parallel) ncores <- detectCores()
 cov.reestim <- TRUE
@@ -75,4 +79,3 @@ plotGame(res, equilibrium = equilibrium, add = TRUE)
 
 }
 }
-

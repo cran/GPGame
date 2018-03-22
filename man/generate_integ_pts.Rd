@@ -5,7 +5,8 @@
 \title{Strategy generation}
 \usage{
 generate_integ_pts(n.s, d, nobj, x.to.obj = NULL, gridtype = "cartesian",
-  equilibrium = "NE", lb = rep(0, d), ub = rep(1, d))
+  equilibrium = "NE", lb = rep(0, d), ub = rep(1, d),
+  include.obs = FALSE, model = NULL, seed = 42)
 }
 \arguments{
 \item{n.s}{scalar or vector. If scalar, total number of strategies (to be divided equally among players),
@@ -19,9 +20,15 @@ otherwise number of strategies per player.}
 
 \item{gridtype}{either "\code{cartesian}" or "\code{lhs}", or a vector to define a different type for each player.}
 
-\item{equilibrium}{either "\code{NE}", "\code{KSE}" or "\code{NKSE}"}
+\item{equilibrium}{either "\code{NE}", "\code{KSE}", "\code{CKSE}" or "\code{NKSE}"}
 
 \item{lb, ub}{vectors specifying the bounds of the design space, by default \code{[0,1]^d}}
+
+\item{include.obs}{Boolean, if TRUE observations given in \code{model@X} are added to the integration points (only for \code{KSE} and \code{CKSE})}
+
+\item{model}{optional list of \code{km} models (used if \code{include.obs=TRUE})}
+
+\item{seed}{random seed used by \code{\link[DiceDesign]{lhsDesign}}}
 }
 \value{
 A list containing two matrices, \code{integ.pts} the design of experiments and \code{expanded.indices}
@@ -43,6 +50,9 @@ gridtype = "lhs"
 x.to.obj <- c(1,1,2,2)
 integcontrol <- generate_integ_pts(n.s=n.s, d=4, nobj=2, x.to.obj = x.to.obj, gridtype=gridtype)
 pairs(integcontrol$integ.pts)
-}
-}
 
+# Create a simple 11x11 grid
+integcontrol <- generate_integ_pts(n.s=11^2, d=2, nobj=2, gridtype="cartesian")
+pairs(integcontrol$integ.pts)
+}
+}

@@ -6,7 +6,8 @@
 \usage{
 plotGameGrid(fun = NULL, domain = NULL, n.grid, graphs = c("both",
   "design", "objective"), x.to.obj = NULL, integcontrol = NULL,
-  equilibrium = c("NE", "KSE", "NKSE"), fun.grid = NULL, ...)
+  equilibrium = c("NE", "KSE", "CKSE", "NKSE"), fun.grid = NULL,
+  Nadir = NULL, ...)
 }
 \arguments{
 \item{fun}{name of the function considered}
@@ -22,6 +23,9 @@ plotGameGrid(fun = NULL, domain = NULL, n.grid, graphs = c("both",
 \item{equilibrium}{either "\code{NE}" for Nash, "\code{KSE}" for Kalai-Smoridinsky and "\code{NKSE}" for Nash-Kalai-Smoridinsky}
 
 \item{fun.grid}{optional matrix containing the values of \code{fun} at \code{integ.pts}. Computed if not provided.}
+
+\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+the other coordinates can be set to \code{Inf}.}
 
 \item{...}{further arguments to \code{fun}}
 }
@@ -58,4 +62,3 @@ plotGameGrid("ZDT3", domain = dom, n.grid = 25, equilibrium = "NE", x.to.obj = c
 }
 
 }
-

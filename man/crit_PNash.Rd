@@ -90,4 +90,3 @@ V. Picheny, M. Binois, A. Habbal (2016+), A Bayesian optimization approach to fi
 \seealso{
 \code{\link[GPGame]{crit_SUR_Eq}} for an alternative infill criterion
 }
-

@@ -74,14 +74,17 @@ plotGame(res)
 ##############################################
 }
 }
-\author{
-Victor Picheny, Mickael Binois
-}
 \references{
-V. Picheny, M. Binois, A. Habbal (2016+), A Bayesian optimization approach to find Nash equilibria,
+V. Picheny, M. Binois, A. Habbal (2016+), A Bayesian Optimization approach to find Nash equilibria,
 \emph{https://arxiv.org/abs/1611.02440}.
+
+M. Binois, V. Picheny, A. Habbal, "The Kalai-Smorodinski solution for many-objective Bayesian optimization", 
+NIPS BayesOpt workshop, December 2017, Long Beach, USA,
+\emph{https://bayesopt.github.io/papers/2017/28.pdf}.
 }
 \seealso{
 \code{\link[DiceKriging]{DiceKriging}}, \code{\link[DiceOptim]{DiceOptim}}, \code{\link[KrigInv]{KrigInv}}, \code{\link[GPareto]{GPareto}}
 }
-
+\author{
+Victor Picheny, Mickael Binois
+}

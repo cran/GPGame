@@ -4,14 +4,14 @@
 \alias{getEquilibrium}
 \title{Equilibrium computation of a discrete game for a given matrix with objectives values}
 \usage{
-getEquilibrium(Z, equilibrium = c("NE", "NKSE", "KSE"), nobj = 2, n.s,
-  expanded.indices = NULL, return.design = FALSE, sorted = FALSE,
-  cross = FALSE)
+getEquilibrium(Z, equilibrium = c("NE", "NKSE", "KSE", "CKSE"), nobj = 2,
+  n.s, expanded.indices = NULL, return.design = FALSE, sorted = FALSE,
+  cross = FALSE, kweights = NULL, Nadir = NULL)
 }
 \arguments{
 \item{Z}{is a matrix of size [\code{npts x nsim*nobj}] of objective values, see details,}
 
-\item{equilibrium}{considered type, one of \code{"NE"}, \code{"NKSE"}, \code{"KSE"}}
+\item{equilibrium}{considered type, one of \code{"NE"}, \code{"NKSE"}, \code{"KSE"}, \code{"CKSE"}}
 
 \item{nobj}{nb of objectives (or players)}
 
@@ -25,6 +25,10 @@ otherwise number of strategies per player.}
 \item{sorted}{Boolean; if \code{TRUE}, the last column of expanded.indices is assumed to be sorted in increasing order. This provides a substantial efficiency gain.}
 
 \item{cross}{Should the simulation be crossed? (May be dropped in future versions)}
+
+\item{kweights}{kriging weights for \code{CKS} (TESTING)}
+
+\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. Some coordinates can be set to NULL.}
 }
 \description{
 Computes the equilibrium of three types of games, given a matrix of objectives (or a set of matrices) and the structure of the strategy space.
@@ -110,4 +114,3 @@ plotGameGrid(fun = fun, n.grid = n.s, x.to.obj = x.to.obj, integcontrol=integcon
              equilibrium = "NKSE")
 }
 }
-

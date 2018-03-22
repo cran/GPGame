@@ -7,6 +7,8 @@
 ##' @param x.to.obj,integcontrol see \code{\link[GPGame]{solve_game}} (for Nash equilibrium only)
 ##' @param equilibrium either "\code{NE}" for Nash, "\code{KSE}" for Kalai-Smoridinsky and "\code{NKSE}" for Nash-Kalai-Smoridinsky
 ##' @param fun.grid optional matrix containing the values of \code{fun} at \code{integ.pts}. Computed if not provided.
+##' @param Nadir optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+##' the other coordinates can be set to \code{Inf}.
 ##' @param ... further arguments to \code{fun}
 ##' @return list returned by invisible() with elements:
 ##' \itemize{
@@ -41,7 +43,7 @@
 ##' }
 ##'
 plotGameGrid <- function(fun=NULL, domain=NULL, n.grid, graphs = c("both", "design", "objective"), x.to.obj = NULL,
-                         integcontrol = NULL, equilibrium = c("NE", "KSE", "NKSE"), fun.grid = NULL, ...){
+                         integcontrol = NULL, equilibrium = c("NE", "KSE", "CKSE", "NKSE"), fun.grid = NULL, Nadir = NULL, ...){
 
   if (is.null(fun) && is.null(fun.grid)) {
     cat("Either fun or fun.grid must be provided \n")
@@ -84,11 +86,12 @@ plotGameGrid <- function(fun=NULL, domain=NULL, n.grid, graphs = c("both", "desi
   if (is.null(fun.grid)) fun.grid <- t(apply(integ.pts, 1, fun, ... = ...))
   nobj <- ncol(fun.grid)
   trueEq <- getEquilibrium(Z=fun.grid, equilibrium = equilibrium, nobj=nobj, n.s=n.grid, return.design=TRUE,
-                           expanded.indices = expanded.indices, sorted=TRUE)
+                           expanded.indices = expanded.indices, sorted=TRUE, Nadir = Nadir)
 
   trueEqPoff <- trueEq[[1]]
   trueEqdesign <- integ.pts[trueEq[[2]],]
-  I.nd <- is_dominated(t(fun.grid))
+  # I.nd <- is_dominated(t(fun.grid))
+  I.nd <- nonDom(fun.grid, return.idx=TRUE)
   trueParetoFront <- fun.grid[!I.nd,]
 
   # Plot actual problem and solution
@@ -161,6 +164,8 @@ plotGameGrid <- function(fun=NULL, domain=NULL, n.grid, graphs = c("both", "desi
 ##' @param simus optional matrix of conditional simulation if \code{UQ_Eq} is \code{TRUE}
 ##' @param integcontrol list with \code{n.s} element (maybe n.s should be returned by solve_game). See \code{\link[GPGame]{solve_game}}.
 ##' @param simucontrol optional list for handling conditional simulations. See \code{\link[GPGame]{solve_game}}.
+##' @param Nadir optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+##' the other coordinates can be set to \code{Inf}.
 ##' @param ncores number of CPU available (> 1 makes mean parallel \code{TRUE})
 ##' @export
 ##' @examples
@@ -169,7 +174,7 @@ plotGameGrid <- function(fun=NULL, domain=NULL, n.grid, graphs = c("both", "desi
 ##' library(parallel)
 ##'
 ##' # Turn off on Windows
-##' parallel <- TRUE # FALSE #
+##' parallel <- FALSE # TRUE
 ##' ncores <- 1
 ##' if(parallel) ncores <- detectCores()
 ##' cov.reestim <- TRUE
@@ -210,7 +215,7 @@ plotGameGrid <- function(fun=NULL, domain=NULL, n.grid, graphs = c("both", "desi
 ##'
 ##'
 ##' }
-plotGame <- function(res, equilibrium = "NE", add = FALSE, UQ_eq = TRUE, simus = NULL, integcontrol = NULL, simucontrol = NULL, ncores = 1){
+plotGame <- function(res, equilibrium = "NE", add = FALSE, UQ_eq = TRUE, simus = NULL, integcontrol = NULL, simucontrol = NULL, Nadir = NULL, ncores = 1){
 
   if (length(res$model)>2) {
     cat("plotGame works only for two players/objectives \n")
@@ -227,12 +232,12 @@ plotGame <- function(res, equilibrium = "NE", add = FALSE, UQ_eq = TRUE, simus =
       if (typeof(simus) == "character") {
         cat("Conditional simulations failed - maybe there are too many integration points \n Correct or set UQ_eq = FALSE \n")
         Eq_simu <- NULL
-        break;
+        return(NA)
       }
     }
     if (is.null(integcontrol$n.s)) integcontrol$n.s <- apply(res$integcontrol$expanded.indices, 2, max)
     Eq_simu <- getEquilibrium(simus, equilibrium = equilibrium, nobj = length(res$model), n.s = integcontrol$n.s,
-                              expanded.indices = res$integcontrol$expanded.indices, sorted = TRUE, cross = FALSE)
+                              expanded.indices = res$integcontrol$expanded.indices, sorted = TRUE, cross = FALSE, Nadir = Nadir)
   } else {
     Eq_simu <- NULL
   }

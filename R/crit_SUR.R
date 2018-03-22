@@ -14,13 +14,16 @@
 ##' first all the trajectories for obj1, then obj2, etc.)
 ##' @param precalc.data is a list of length \code{nobj} of precalculated data (based on kriging models at integration points)
 ##' for faster computation - computed if not provided
-##' @param equilibrium equilibrium type: either "\code{NE}", "\code{KSE}" or "\code{NKSE}"
+##' @param equilibrium equilibrium type: either "\code{NE}", "\code{KSE}", "\code{CKSE}" or "\code{NKSE}"
 ##' @param n.ynew is the number of \code{ynew} simulations (if not provided, equal to the number of trajectories)
 ##' @param cross if \code{TRUE}, all the combinations of trajectories are used (increases accuracy but also cost)
 ##' @param IS if \code{TRUE}, importance sampling is used for ynew
 ##' @param plot if \code{TRUE}, draws equilibria samples (should always be turned off)
 ## ' #@param cand.pts,J necessary if a filter has been applied (to avoid mismatch between idx and expanded.indices).
 ## ' #cand.pts is a [ncand x dim] matrix (without filter, equal to integ.pts) and J the vector of indices of cand.pts on the grid.
+##' @param kweights kriging weights for \code{CKS} (TESTING)
+##' @param Nadir optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined,
+##' the other coordinates can be set to \code{Inf}.
 ##' @export
 ##' @seealso \code{\link[GPGame]{crit_PNash}} for an alternative infill criterion
 ##' @references
@@ -29,7 +32,9 @@
 ##' @importFrom stats cov
 ##' @importFrom GPareto checkPredict plotParetoEmp
 ##' @importFrom KrigInv predict_nobias_km computeQuickKrigcov precomputeUpdateData
-##' @importFrom emoa is_dominated nondominated_points
+##' @importFrom grDevices rainbow
+##' @importFrom graphics pairs points
+## ' @importFrom emoa is_dominated nondominated_points
 ##' @examples
 ##' \dontrun{
 ##' ##############################################
@@ -90,7 +95,7 @@
 ##' }
 ##'
 crit_SUR_Eq <- function(idx, model, integcontrol, Simu, precalc.data=NULL, equilibrium,
-                        n.ynew=NULL, cross=FALSE, IS=FALSE, plot=FALSE){
+                        n.ynew=NULL, cross=FALSE, IS=FALSE, plot=FALSE, kweights = NULL, Nadir = NULL){
 
   # if (is.null(cand.pts)) cand.pts <- integ.pts
 
@@ -148,7 +153,8 @@ crit_SUR_Eq <- function(idx, model, integcontrol, Simu, precalc.data=NULL, equil
 
     sorted <- !is.unsorted(expanded.indices[,nobj])
     if (plot) plot(NA, xlim=c(-200, 100), ylim=c(-50,-10))
-    Gamma <- apply(Ynew2, 1, computeGamma, Simu=Simu, lambda=lambda, Ynew=Ynew1, n.s=n.s,
+
+    Gamma <- apply(Ynew2, 1, computeGamma, Simu=Simu, lambda=lambda, Ynew=Ynew1, n.s=n.s, kweights = kweights, Nadir=Nadir,
                    expanded.indices=expanded.indices, cross=cross, sorted=sorted, equilibrium = equilibrium, plot=plot)
 
     return(mean(Gamma, na.rm =TRUE))
@@ -169,7 +175,8 @@ crit_SUR_Eq <- function(idx, model, integcontrol, Simu, precalc.data=NULL, equil
 ## ' @param cross if TRUE, all the combinations of trajectories are used
 ## ' @param sorted Boolean; if TRUE, the last column of expanded.indices is assumed to be sorted in increasing order. This provides a substantial efficiency gain.
 ## ' @param plot if TRUE, draws equilibria samples (should always be turned off)
-computeGamma <- function(ynew, Simu, lambda, equilibrium, Ynew, n.s = NULL,
+## ' @param kweights kriging weights for \code{CKS} (TESTING)
+computeGamma <- function(ynew, Simu, lambda, equilibrium, Ynew, n.s = NULL, kweights = NULL, Nadir = NULL,
                          expanded.indices = NULL, cross = FALSE, sorted = NULL, plot=FALSE){
 
   if (is.null(sorted)) {
@@ -185,7 +192,7 @@ computeGamma <- function(ynew, Simu, lambda, equilibrium, Ynew, n.s = NULL,
   }
 
   NE_simu_new <- getEquilibrium(Simu, equilibrium = equilibrium, nobj=nobj, n.s=n.s, expanded.indices=expanded.indices,
-                                sorted=sorted, cross=cross)
+                                sorted=sorted, cross=cross, kweights = kweights, Nadir=Nadir)
 
   # Remove simulations without equilibrium
   NE_simu_new <- NE_simu_new[which(!is.na(NE_simu_new[,1])),, drop = FALSE]
@@ -193,14 +200,15 @@ computeGamma <- function(ynew, Simu, lambda, equilibrium, Ynew, n.s = NULL,
   if (plot) {
     points(NE_simu_new[,1], NE_simu_new[,2], pch=sample.int(25,1), col=sample(rainbow(25),1))
   }
+
   if(is.null(dim(NE_simu_new)))  return(NA)
   else{
-    result <- det(cov(NE_simu_new))
+    result <- determinant(cov(NE_simu_new), logarithm = TRUE)[[1]][1]
     if(is.na(result)) return(NA)
     ## If rank of cov(NE_simu_new) inferior to nobj
-    if(result <= 0){
+    if(result == -Inf){
       result <- eigen(cov(NE_simu_new), only.values = T)
-      result <- prod(result$values[which(result$values >0)])
+      result <- sum(log(result$values[which(result$values >0)]))
     }
     return(result)
   }
