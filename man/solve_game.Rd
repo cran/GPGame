@@ -4,11 +4,31 @@
 \alias{solve_game}
 \title{Main solver}
 \usage{
-solve_game(fun, ..., equilibrium = "NE", crit = "sur", model = NULL,
-  n.init = NULL, n.ite, d, nobj, x.to.obj = NULL, noise.var = NULL,
-  Nadir = NULL, integcontrol = NULL, simucontrol = NULL,
-  filtercontrol = NULL, kmcontrol = NULL, returncontrol = NULL,
-  ncores = 1, trace = 1, seed = NULL)
+solve_game(
+  fun,
+  ...,
+  equilibrium = "NE",
+  crit = "sur",
+  model = NULL,
+  n.init = NULL,
+  n.ite,
+  d,
+  nobj,
+  x.to.obj = NULL,
+  noise.var = NULL,
+  Nadir = NULL,
+  Shadow = NULL,
+  integcontrol = NULL,
+  simucontrol = NULL,
+  filtercontrol = NULL,
+  kmcontrol = NULL,
+  returncontrol = NULL,
+  ncores = 1,
+  trace = 1,
+  seed = NULL,
+  calibcontrol = NULL,
+  freq.exploit = 1000
+)
 }
 \arguments{
 \item{fun}{fonction with vectorial output}
@@ -36,8 +56,8 @@ solve_game(fun, ..., equilibrium = "NE", crit = "sur", model = NULL,
 a function (type closure) with vectorial output (variable noise, different for each objective) or \code{"given_by_fn"}, see Details.
 If not provided, \code{noise.var} is taken as the average of \code{model@noise.var}.}
 
-\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
-the other coordinates can be set to \code{Inf}.}
+\item{Nadir, Shadow}{optional vectors of size \code{nobj}. Replaces the nadir or shadow point for \code{KSE}. If only a subset of values needs to be defined, 
+the other coordinates can be set to \code{Inf} (resp. -\code{Inf} for the shadow).}
 
 \item{integcontrol}{optional list for handling integration points. See Details.}
 
@@ -54,6 +74,11 @@ the other coordinates can be set to \code{Inf}.}
 \item{trace}{controls the level of printing: \code{0} (no printing), \code{1} (minimal printing), \code{3} (detailed printing)}
 
 \item{seed}{to fix the random variable generator}
+
+\item{calibcontrol}{an optional list for calibration problems, containing \code{target} a vector of target values for the objectives, 
+\code{log} a Boolean stating if a log transformation should be used or not, and \code{offset} a (small) scalar so that each objective is log(offset + (y-T^2)).}
+
+\item{freq.exploit}{an optional integer to force exploitation (i.e. evaluation of the predicted equilibrium) every \code{freq.exploit} iterations}
 }
 \value{
 A list with components:
@@ -65,7 +90,7 @@ A list with components:
 \item{\code{Eq.design, Eq.poff}}{: estimated equilibrium and corresponding pay-off}
 }
 
-Note: with CKSE, kweights are not used when the mean on integ.pts is used
+Note: with CKSE, kweights are not used when the mean on integ.pts is used. Also, CKSE does not support non-constant mean at this stage.
 }
 \description{
 Main function to solve games.
@@ -108,7 +133,7 @@ The boolean \code{force.exploit.last} (default to \code{TRUE}) allows to evaluat
 instead of using \code{crit} (i.e., \code{sur}) for \code{KSE} and \code{CKSE}.
 }
 \examples{
-\dontrun{
+\donttest{
 
 ################################################################
 # Example 1: Nash equilibrium, 2 variables, 2 players, no filter

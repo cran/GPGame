@@ -25,7 +25,6 @@ Extract non-dominated points from a set, or with respect to a reference Pareto f
 Use Kung non-domination sorting
 }
 \examples{
-\dontrun{
 d <- 6
 n <- 1000
 n2 <- 1000
@@ -36,20 +35,6 @@ indPF <- nonDom(ref, return.idx = TRUE)
 all(nonDom(ref) == ref[indPF,])
 
 system.time(res <- nonDom(test, ref[indPF,,drop = FALSE], return.idx = TRUE))
-
-res2 <- rep(NA, n2)
-library(emoa)
-t0 <- Sys.time()
-for(i in 1:n2){
-  res2[i] <- !is_dominated(t(rbind(test[i,, drop = FALSE], ref[indPF,])))[1]
-}
-print(Sys.time() - t0)
-
-all(res == which(res2))
-
-all(nonDom(test, ref) == test[res2,])
-
-}
 }
 \references{
 Kung, H. T., Luccio, F., & Preparata, F. P. (1975). On finding the maxima of a set of vectors. Journal of the ACM (JACM), 22(4), 469-476.

@@ -4,8 +4,14 @@
 \alias{crit_PNash}
 \title{Probability for a strategy of being a Nash Equilibrium}
 \usage{
-crit_PNash(idx, integcontrol, type = "simu", model, ncores = 1,
-  control = list(nsim = 100, eps = 1e-06))
+crit_PNash(
+  idx,
+  integcontrol,
+  type = "simu",
+  model,
+  ncores = 1,
+  control = list(nsim = 100, eps = 1e-06)
+)
 }
 \arguments{
 \item{idx}{is the index on the grid of the strategy evaluated}
@@ -24,12 +30,15 @@ a \code{nobj} vector containting the number of strategies per player}
 
 \item{eps}{numerical jitter for stability}
 }
+\value{
+Probability of being a Nash equibrium corrsponding to \code{idx}.
+}
 \description{
 Acquisition function for solving game problems based on the probability for a strategy of being a Nash Equilibrium.
 The probability can be computed exactly using the mutivariate Gaussian CDF (\code{mnormt}, \code{pmvnorm}) or by Monte Carlo.
 }
 \examples{
-\dontrun{
+\donttest{
 ##############################################
 # Example 1: 2 variables, 2 players, no filter
 ##############################################

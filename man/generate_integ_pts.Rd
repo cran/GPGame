@@ -4,9 +4,21 @@
 \alias{generate_integ_pts}
 \title{Strategy generation}
 \usage{
-generate_integ_pts(n.s, d, nobj, x.to.obj = NULL, gridtype = "cartesian",
-  equilibrium = "NE", lb = rep(0, d), ub = rep(1, d),
-  include.obs = FALSE, model = NULL, seed = 42)
+generate_integ_pts(
+  n.s,
+  d,
+  nobj,
+  x.to.obj = NULL,
+  gridtype = "cartesian",
+  equilibrium = "NE",
+  lb = rep(0, d),
+  ub = rep(1, d),
+  include.obs = FALSE,
+  model = NULL,
+  init_set = NULL,
+  include_set = NULL,
+  seed = 42
+)
 }
 \arguments{
 \item{n.s}{scalar or vector. If scalar, total number of strategies (to be divided equally among players),
@@ -28,6 +40,10 @@ otherwise number of strategies per player.}
 
 \item{model}{optional list of \code{km} models (used if \code{include.obs=TRUE})}
 
+\item{init_set}{large grid to subsample from}
+
+\item{include_set}{grid to be included in the larger one generated}
+
 \item{seed}{random seed used by \code{\link[DiceDesign]{lhsDesign}}}
 }
 \value{
@@ -38,7 +54,7 @@ the corresponding indices (for \code{NE}), and the vector \code{n.s}
 Preprocessing to link strategies and designs.
 }
 \examples{
-\dontrun{
+\donttest{
 ##############################################
 ### 4 variables, 2 players, no filter
 ##############################################

@@ -1,224 +1,228 @@
 #' Main function to solve games.
-##' @title Main solver
-##' @details If \code{noise.var="given_by_fn"}, \code{fn} returns a list of two vectors, the first being the objective functions and the second
-##' the corresponding noise variances.
-##'
-##' \code{integcontrol} controls the way the design space is discretized. One can directly provide a set of points \code{integ.pts} with
-##' corresponding indices \code{expanded.indices} (for \code{NE}). Otherwise, the points are generated according to the number of strategies \code{n.s}.
-##' If \code{n.s} is a scalar, it corresponds to the total number of strategies (to be divided equally among players),
-##' otherwise it corresponds to the nb of strategies per player. In addition, one may choose the type of discretization with \code{gridtype}.
-##' Options are '\code{lhs}' or '\code{cartesian}'. Finally, \code{lb} and \code{ub} are vectors specifying the bounds for the design variables.
-##' By default the design space is \code{[0,1]^d}.
-##' A \code{renew} slot is available, if \code{TRUE}, then \code{integ.pts} are changed at each iteration. Available only for \code{KSE} and \code{CKSE}.
-##' For \code{CKSE}, setting the slot \code{kweights=TRUE} allows to increase the number of integration points, with \code{nsamp} 
-##' (default to \code{1e4}) virtual simulation points.
-##'
-##' \code{simucontrol} controls options on conditional GP simulations. Options are \code{IS}: if \code{TRUE}, importance sampling is used for \code{ynew};
-##' \code{n.ynew} number of samples of \code{Y(x_{n+1})} and \code{n.sim} number of sample path generated.
-##'
-##' \code{filtercontrol} controls filtering options. \code{filter} sets how to select a subset of simulation and candidate points,
-##' either either a single value or a vector of two to use different filters for simulation and candidate points.
-##' Possible values are '\code{window}', '\code{Pnash}' (for \code{NE}), '\code{PND}' (probability of non domination), '\code{none}'.
-##' \code{nsimPoints} and \code{ncandPoints} set the maximum number of simulation/candidate points wanted
-##' (use with filter '\code{Pnash}' for now). Default values are \code{800} and \code{200}, resp.
-##' \code{randomFilter} (\code{TRUE} by default except for filter \code{window}) sets whereas the filter acts randomly or deterministically.
-##' For more than 3 objectives, \code{PND} is estimated by sampling; the number of samples is controled by \code{nsamp} (default to \code{max(20, 5 * nobj)}).
-##'
-##' \code{kmcontrol} Options for handling \code{nobj} \code{\link[DiceKriging]{km}} models.
-##' \code{cov.reestim} (Boolean, \code{TRUE} by default) specifies if the kriging hyperparameters
-##' should be re-estimated at each iteration,
-##'
-##' \code{returncontrol} sets options for the last iterations and what is returned by the algorithm.
-##' \code{track.Eq} allows to estimate the equilibrium at each iteration; options are '\code{none}' to do nothing,
-##' "\code{mean}" (default) to compute the equilibrium of the prediction mean (all candidates),
-##'  "\code{empirical}" (for \code{KSE}) and "\code{pex}"/"\code{psim}" (\code{NE} only)
-##' for using \code{Pnash} estimate (along with mean estimate, on integ.pts only, NOT reestimated if \code{filter.simu} or \code{crit} is \code{Pnash}).
-##' The boolean \code{force.exploit.last} (default to \code{TRUE}) allows to evaluate the equilibrium on the predictive mean - if not already evaluated -
-##' instead of using \code{crit} (i.e., \code{sur}) for \code{KSE} and \code{CKSE}.
-##'
-##' @param fun fonction with vectorial output
-##' @param equilibrium either '\code{NE}', '\code{KSE}', '\code{CKSE}' or '\code{NKSE}' for Nash / Kalai-Smorodinsky / Copula-Kalai-Smorodinsky
-##' / Nash-Kalai-Smorodinsky equilibria
-##' @param crit '\code{sur}' (default) is available for all equilibria, '\code{psim}' and '\code{pex}' are available for Nash
-##' @param model list of \code{\link[DiceKriging]{km}} models
-##' @param n.init number of points of the initial design of experiments if no model is given
-##' @param n.ite number of iterations of sequential optimization
-##' @param d variable dimension
-##' @param nobj number of objectives (players)
-##' @param x.to.obj for \code{NE} and \code{NKSE}, which variables for which objective
-##' @param noise.var noise variance. Either a scalar (same noise for all objectives), a vector (constant noise, different for each objective),
-##' a function (type closure) with vectorial output (variable noise, different for each objective) or \code{"given_by_fn"}, see Details.
-##' If not provided, \code{noise.var} is taken as the average of \code{model@noise.var}.
-##' @param integcontrol optional list for handling integration points. See Details.
-##' @param simucontrol optional list for handling conditional simulations. See Details.
-##' @param filtercontrol optional list for handling filters. See Details.
-##' @param kmcontrol optional list for handling \code{\link[DiceKriging]{km}} models. See Details.
-##' @param returncontrol optional list for choosing return options. See Details.
-##' @param ncores number of CPU available (> 1 makes mean parallel \code{TRUE})
-##' @param trace controls the level of printing: \code{0} (no printing), \code{1} (minimal printing), \code{3} (detailed printing)
-##' @param seed to fix the random variable generator
-##' @param Nadir optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
-##' the other coordinates can be set to \code{Inf}.
-##' @param ... additional parameter to be passed to \code{fun}
-##' @return
-##' A list with components:
-##' \itemize{
-##' \item{\code{model}}{: a list of objects of class \code{\link[DiceKriging]{km}} corresponding to the last kriging models fitted.}
-##' \item{\code{Jplus}}{: recorded values of the acquisition function maximizer}
-##' \item{\code{integ.pts} and  \code{expanded.indices}}{: the discrete space used,}
-##' \item{\code{predEq}}{: a list containing the recorded values of the estimated best solution,}
-##' \item{\code{Eq.design, Eq.poff}}{: estimated equilibrium and corresponding pay-off}
-##' }
-##'
-##' Note: with CKSE, kweights are not used when the mean on integ.pts is used
-##'
-##' @export
+#' @title Main solver
+#' @details If \code{noise.var="given_by_fn"}, \code{fn} returns a list of two vectors, the first being the objective functions and the second
+#' the corresponding noise variances.
+#'
+#' \code{integcontrol} controls the way the design space is discretized. One can directly provide a set of points \code{integ.pts} with
+#' corresponding indices \code{expanded.indices} (for \code{NE}). Otherwise, the points are generated according to the number of strategies \code{n.s}.
+#' If \code{n.s} is a scalar, it corresponds to the total number of strategies (to be divided equally among players),
+#' otherwise it corresponds to the nb of strategies per player. In addition, one may choose the type of discretization with \code{gridtype}.
+#' Options are '\code{lhs}' or '\code{cartesian}'. Finally, \code{lb} and \code{ub} are vectors specifying the bounds for the design variables.
+#' By default the design space is \code{[0,1]^d}.
+#' A \code{renew} slot is available, if \code{TRUE}, then \code{integ.pts} are changed at each iteration. Available only for \code{KSE} and \code{CKSE}.
+#' For \code{CKSE}, setting the slot \code{kweights=TRUE} allows to increase the number of integration points, with \code{nsamp} 
+#' (default to \code{1e4}) virtual simulation points.
+#'
+#' \code{simucontrol} controls options on conditional GP simulations. Options are \code{IS}: if \code{TRUE}, importance sampling is used for \code{ynew};
+#' \code{n.ynew} number of samples of \code{Y(x_{n+1})} and \code{n.sim} number of sample path generated.
+#'
+#' \code{filtercontrol} controls filtering options. \code{filter} sets how to select a subset of simulation and candidate points,
+#' either either a single value or a vector of two to use different filters for simulation and candidate points.
+#' Possible values are '\code{window}', '\code{Pnash}' (for \code{NE}), '\code{PND}' (probability of non domination), '\code{none}'.
+#' \code{nsimPoints} and \code{ncandPoints} set the maximum number of simulation/candidate points wanted
+#' (use with filter '\code{Pnash}' for now). Default values are \code{800} and \code{200}, resp.
+#' \code{randomFilter} (\code{TRUE} by default except for filter \code{window}) sets whereas the filter acts randomly or deterministically.
+#' For more than 3 objectives, \code{PND} is estimated by sampling; the number of samples is controled by \code{nsamp} (default to \code{max(20, 5 * nobj)}).
+#'
+#' \code{kmcontrol} Options for handling \code{nobj} \code{\link[DiceKriging]{km}} models.
+#' \code{cov.reestim} (Boolean, \code{TRUE} by default) specifies if the kriging hyperparameters
+#' should be re-estimated at each iteration,
+#'
+#' \code{returncontrol} sets options for the last iterations and what is returned by the algorithm.
+#' \code{track.Eq} allows to estimate the equilibrium at each iteration; options are '\code{none}' to do nothing,
+#' "\code{mean}" (default) to compute the equilibrium of the prediction mean (all candidates),
+#'  "\code{empirical}" (for \code{KSE}) and "\code{pex}"/"\code{psim}" (\code{NE} only)
+#' for using \code{Pnash} estimate (along with mean estimate, on integ.pts only, NOT reestimated if \code{filter.simu} or \code{crit} is \code{Pnash}).
+#' The boolean \code{force.exploit.last} (default to \code{TRUE}) allows to evaluate the equilibrium on the predictive mean - if not already evaluated -
+#' instead of using \code{crit} (i.e., \code{sur}) for \code{KSE} and \code{CKSE}.
+#'
+#' @param fun fonction with vectorial output
+#' @param equilibrium either '\code{NE}', '\code{KSE}', '\code{CKSE}' or '\code{NKSE}' for Nash / Kalai-Smorodinsky / Copula-Kalai-Smorodinsky
+#' / Nash-Kalai-Smorodinsky equilibria
+#' @param crit '\code{sur}' (default) is available for all equilibria, '\code{psim}' and '\code{pex}' are available for Nash
+#' @param model list of \code{\link[DiceKriging]{km}} models
+#' @param n.init number of points of the initial design of experiments if no model is given
+#' @param n.ite number of iterations of sequential optimization
+#' @param d variable dimension
+#' @param nobj number of objectives (players)
+#' @param x.to.obj for \code{NE} and \code{NKSE}, which variables for which objective
+#' @param noise.var noise variance. Either a scalar (same noise for all objectives), a vector (constant noise, different for each objective),
+#' a function (type closure) with vectorial output (variable noise, different for each objective) or \code{"given_by_fn"}, see Details.
+#' If not provided, \code{noise.var} is taken as the average of \code{model@noise.var}.
+#' @param integcontrol optional list for handling integration points. See Details.
+#' @param simucontrol optional list for handling conditional simulations. See Details.
+#' @param filtercontrol optional list for handling filters. See Details.
+#' @param kmcontrol optional list for handling \code{\link[DiceKriging]{km}} models. See Details.
+#' @param returncontrol optional list for choosing return options. See Details.
+#' @param ncores number of CPU available (> 1 makes mean parallel \code{TRUE})
+#' @param trace controls the level of printing: \code{0} (no printing), \code{1} (minimal printing), \code{3} (detailed printing)
+#' @param seed to fix the random variable generator
+#' @param Nadir,Shadow optional vectors of size \code{nobj}. Replaces the nadir or shadow point for \code{KSE}. If only a subset of values needs to be defined, 
+#' the other coordinates can be set to \code{Inf} (resp. -\code{Inf} for the shadow).
+#' @param calibcontrol an optional list for calibration problems, containing \code{target} a vector of target values for the objectives, 
+#' \code{log} a Boolean stating if a log transformation should be used or not, and \code{offset} a (small) scalar so that each objective is log(offset + (y-T^2)).
+#' @param freq.exploit an optional integer to force exploitation (i.e. evaluation of the predicted equilibrium) every \code{freq.exploit} iterations
+#' @param ... additional parameter to be passed to \code{fun}
+#' @return
+#' A list with components:
+#' \itemize{
+#' \item{\code{model}}{: a list of objects of class \code{\link[DiceKriging]{km}} corresponding to the last kriging models fitted.}
+#' \item{\code{Jplus}}{: recorded values of the acquisition function maximizer}
+#' \item{\code{integ.pts} and  \code{expanded.indices}}{: the discrete space used,}
+#' \item{\code{predEq}}{: a list containing the recorded values of the estimated best solution,}
+#' \item{\code{Eq.design, Eq.poff}}{: estimated equilibrium and corresponding pay-off}
+#' }
+#'
+#' Note: with CKSE, kweights are not used when the mean on integ.pts is used. Also, CKSE does not support non-constant mean at this stage.
+#'
+#' @export
 ## ' @importFrom grDevices dev.off pdf rainbow
 ## ' @importFrom graphics axis pairs par points title
-##' @importFrom stats pnorm qnorm rnorm dnorm runif
-##' @importFrom methods slot
+#' @importFrom stats pnorm qnorm rnorm dnorm runif
+#' @importFrom methods slot
 ## ' @importFrom graphics filled.contour
-##' @import DiceKriging DiceDesign parallel
-##' @importFrom MASS mvrnorm
+#' @import DiceKriging DiceDesign parallel
+#' @importFrom MASS mvrnorm
+#' @importFrom utils str
 ## ' @importFrom grDevices terrain.colors
 ## ' @importFrom graphics legend
-##' @useDynLib GPGame, .registration = TRUE
-##' @references
-##' V. Picheny, M. Binois, A. Habbal (2016+), A Bayesian optimization approach to find Nash equilibria,
-##' \emph{https://arxiv.org/abs/1611.02440}.
-##' @examples
-##' \dontrun{
-##'
-##' ################################################################
-##' # Example 1: Nash equilibrium, 2 variables, 2 players, no filter
-##' ################################################################
-##' # Define objective function (R^2 -> R^2)
-##' fun1 <- function (x)
-##' {
-##'   if (is.null(dim(x)))    x <- matrix(x, nrow = 1)
-##'   b1 <- 15 * x[, 1] - 5
-##'   b2 <- 15 * x[, 2]
-##'   return(cbind((b2 - 5.1*(b1/(2*pi))^2 + 5/pi*b1 - 6)^2 + 10*((1 - 1/(8*pi)) * cos(b1) + 1),
-##'                -sqrt((10.5 - b1)*(b1 + 5.5)*(b2 + 0.5)) - 1/30*(b2 - 5.1*(b1/(2*pi))^2 - 6)^2-
-##'                 1/3 * ((1 - 1/(8 * pi)) * cos(b1) + 1)))
-##' }
-##'
-##' # To use parallel computation (turn off on Windows)
-##' library(parallel)
-##' parallel <- FALSE #TRUE #
-##' if(parallel) ncores <- detectCores() else ncores <- 1
-##'
-##' # Simple configuration: no filter, discretization is a 21x21 grid
-##'
-##' # Grid definition
-##' n.s <- rep(21, 2)
-##' x.to.obj   <- c(1,2)
-##' gridtype <- 'cartesian'
-##'
-##' # Run solver with 6 initial points, 4 iterations
-##' # Increase n.ite to at least 10 for better results
-##' res <- solve_game(fun1, equilibrium = "NE", crit = "sur", n.init=6, n.ite=4,
-##'                   d = 2, nobj=2, x.to.obj = x.to.obj,
-##'                   integcontrol=list(n.s=n.s, gridtype=gridtype),
-##'                   ncores = ncores, trace=1, seed=1)
-##'
-##' # Get estimated equilibrium and corresponding pay-off
-##' NE <- res$Eq.design
-##' Poff <- res$Eq.poff
-##'
-##' # Draw results
-##' plotGame(res)
-##'
-##'################################################################
-##' # Example 2: same example, KS equilibrium with given Nadir
-##'################################################################
-##' # Run solver with 6 initial points, 4 iterations
-##' # Increase n.ite to at least 10 for better results
-##' res <- solve_game(fun1, equilibrium = "KSE", crit = "sur", n.init=6, n.ite=4,
-##'                   d = 2, nobj=2, x.to.obj = x.to.obj,
-##'                   integcontrol=list(n.s=400, gridtype="lhs"),
-##'                   ncores = ncores, trace=1, seed=1, Nadir=c(Inf, -20))
-##'
-##' # Get estimated equilibrium and corresponding pay-off
-##' NE <- res$Eq.design
-##' Poff <- res$Eq.poff
-##'
-##' # Draw results
-##' plotGame(res, equilibrium = "KSE", Nadir=c(Inf, -20))
-##'
-##' ################################################################
-##' # Example 3: Nash equilibrium, 4 variables, 2 players, filtering
-##' ################################################################
-##' fun2 <- function(x, nobj = 2){
-##'   if (is.null(dim(x)))     x <- matrix(x, 1)
-##'   y <- matrix(x[, 1:(nobj - 1)], nrow(x))
-##'   z <- matrix(x[, nobj:ncol(x)], nrow(x))
-##'   g <- rowSums((z - 0.5)^2)
-##'   tmp <- t(apply(cos(y * pi/2), 1, cumprod))
-##'   tmp <- cbind(t(apply(tmp, 1, rev)), 1)
-##'   tmp2 <- cbind(1, t(apply(sin(y * pi/2), 1, rev)))
-##'   return(tmp * tmp2 * (1 + g))
-##' }
-##'
-##' # Grid definition: player 1 plays x1 and x2, player 2 x3 and x4
-##' # The grid is a lattice made of two LHS designs of different sizes
-##' n.s <- c(44, 43)
-##' x.to.obj   <- c(1,1,2,2)
-##' gridtype <- 'lhs'
-##'
-##' # Set filtercontrol: window filter applied for integration and candidate points
-##' # 500 simulation and 200 candidate points are retained.
-##' filtercontrol <- list(nsimPoints=500, ncandPoints=200,
-##'                    filter=c("window", "window"))
-##'
-##' # Set km control: lower bound is specified for the covariance range
-##' # Covariance type and model trend are specified
-##' kmcontrol <- list(lb=rep(.2,4), model.trend=~1, covtype="matern3_2")
-##'
-##' # Run solver with 20 initial points, 4 iterations
-##' # Increase n.ite to at least 20 for better results
-##' res <- solve_game(fun2, equilibrium = "NE", crit = "psim", n.init=20, n.ite=2,
-##'                   d = 4, nobj=2, x.to.obj = x.to.obj,
-##'                   integcontrol=list(n.s=n.s, gridtype=gridtype),
-##'                   filtercontrol=filtercontrol,
-##'                   kmcontrol=kmcontrol,
-##'                   ncores = 1, trace=1, seed=1)
-##'
-##' # Get estimated equilibrium and corresponding pay-off
-##' NE <- res$Eq.design
-##' Poff <- res$Eq.poff
-##'
-##' # Draw results
-##' plotGame(res)
-##'
-##' ################################################################
-##' # Example 4: same example, KS equilibrium
-##' ################################################################
-##'
-##' # Grid definition: simple lhs
-##' integcontrol=list(n.s=1e4, gridtype='lhs')
-##'
-##' # Run solver with 20 initial points, 4 iterations
-##' # Increase n.ite to at least 20 for better results
-##' res <- solve_game(fun2, equilibrium = "KSE", crit = "sur", n.init=20, n.ite=2,
-##'                   d = 4, nobj=2,
-##'                   integcontrol=integcontrol,
-##'                   filtercontrol=filtercontrol,
-##'                   kmcontrol=kmcontrol,
-##'                   ncores = 1, trace=1, seed=1)
-##'
-##' # Get estimated equilibrium and corresponding pay-off
-##' NE <- res$Eq.design
-##' Poff <- res$Eq.poff
-##'
-##' # Draw results
-##' plotGame(res, equilibrium = "KSE")
-##' }
+#' @useDynLib GPGame, .registration = TRUE
+#' @references
+#' V. Picheny, M. Binois, A. Habbal (2016+), A Bayesian optimization approach to find Nash equilibria,
+#' \emph{https://arxiv.org/abs/1611.02440}.
+#' @examples
+#' \donttest{
+#'
+#' ################################################################
+#' # Example 1: Nash equilibrium, 2 variables, 2 players, no filter
+#' ################################################################
+#' # Define objective function (R^2 -> R^2)
+#' fun1 <- function (x)
+#' {
+#'   if (is.null(dim(x)))    x <- matrix(x, nrow = 1)
+#'   b1 <- 15 * x[, 1] - 5
+#'   b2 <- 15 * x[, 2]
+#'   return(cbind((b2 - 5.1*(b1/(2*pi))^2 + 5/pi*b1 - 6)^2 + 10*((1 - 1/(8*pi)) * cos(b1) + 1),
+#'                -sqrt((10.5 - b1)*(b1 + 5.5)*(b2 + 0.5)) - 1/30*(b2 - 5.1*(b1/(2*pi))^2 - 6)^2-
+#'                 1/3 * ((1 - 1/(8 * pi)) * cos(b1) + 1)))
+#' }
+#'
+#' # To use parallel computation (turn off on Windows)
+#' library(parallel)
+#' parallel <- FALSE #TRUE #
+#' if(parallel) ncores <- detectCores() else ncores <- 1
+#'
+#' # Simple configuration: no filter, discretization is a 21x21 grid
+#'
+#' # Grid definition
+#' n.s <- rep(21, 2)
+#' x.to.obj   <- c(1,2)
+#' gridtype <- 'cartesian'
+#'
+#' # Run solver with 6 initial points, 4 iterations
+#' # Increase n.ite to at least 10 for better results
+#' res <- solve_game(fun1, equilibrium = "NE", crit = "sur", n.init=6, n.ite=4,
+#'                   d = 2, nobj=2, x.to.obj = x.to.obj,
+#'                   integcontrol=list(n.s=n.s, gridtype=gridtype),
+#'                   ncores = ncores, trace=1, seed=1)
+#'
+#' # Get estimated equilibrium and corresponding pay-off
+#' NE <- res$Eq.design
+#' Poff <- res$Eq.poff
+#'
+#' # Draw results
+#' plotGame(res)
+#'
+#'################################################################
+#' # Example 2: same example, KS equilibrium with given Nadir
+#'################################################################
+#' # Run solver with 6 initial points, 4 iterations
+#' # Increase n.ite to at least 10 for better results
+#' res <- solve_game(fun1, equilibrium = "KSE", crit = "sur", n.init=6, n.ite=4,
+#'                   d = 2, nobj=2, x.to.obj = x.to.obj,
+#'                   integcontrol=list(n.s=400, gridtype="lhs"),
+#'                   ncores = ncores, trace=1, seed=1, Nadir=c(Inf, -20))
+#'
+#' # Get estimated equilibrium and corresponding pay-off
+#' NE <- res$Eq.design
+#' Poff <- res$Eq.poff
+#'
+#' # Draw results
+#' plotGame(res, equilibrium = "KSE", Nadir=c(Inf, -20))
+#'
+#' ################################################################
+#' # Example 3: Nash equilibrium, 4 variables, 2 players, filtering
+#' ################################################################
+#' fun2 <- function(x, nobj = 2){
+#'   if (is.null(dim(x)))     x <- matrix(x, 1)
+#'   y <- matrix(x[, 1:(nobj - 1)], nrow(x))
+#'   z <- matrix(x[, nobj:ncol(x)], nrow(x))
+#'   g <- rowSums((z - 0.5)^2)
+#'   tmp <- t(apply(cos(y * pi/2), 1, cumprod))
+#'   tmp <- cbind(t(apply(tmp, 1, rev)), 1)
+#'   tmp2 <- cbind(1, t(apply(sin(y * pi/2), 1, rev)))
+#'   return(tmp * tmp2 * (1 + g))
+#' }
+#'
+#' # Grid definition: player 1 plays x1 and x2, player 2 x3 and x4
+#' # The grid is a lattice made of two LHS designs of different sizes
+#' n.s <- c(44, 43)
+#' x.to.obj   <- c(1,1,2,2)
+#' gridtype <- 'lhs'
+#'
+#' # Set filtercontrol: window filter applied for integration and candidate points
+#' # 500 simulation and 200 candidate points are retained.
+#' filtercontrol <- list(nsimPoints=500, ncandPoints=200,
+#'                    filter=c("window", "window"))
+#'
+#' # Set km control: lower bound is specified for the covariance range
+#' # Covariance type and model trend are specified
+#' kmcontrol <- list(lb=rep(.2,4), model.trend=~1, covtype="matern3_2")
+#'
+#' # Run solver with 20 initial points, 4 iterations
+#' # Increase n.ite to at least 20 for better results
+#' res <- solve_game(fun2, equilibrium = "NE", crit = "psim", n.init=20, n.ite=2,
+#'                   d = 4, nobj=2, x.to.obj = x.to.obj,
+#'                   integcontrol=list(n.s=n.s, gridtype=gridtype),
+#'                   filtercontrol=filtercontrol,
+#'                   kmcontrol=kmcontrol,
+#'                   ncores = 1, trace=1, seed=1)
+#'
+#' # Get estimated equilibrium and corresponding pay-off
+#' NE <- res$Eq.design
+#' Poff <- res$Eq.poff
+#'
+#' # Draw results
+#' plotGame(res)
+#'
+#' ################################################################
+#' # Example 4: same example, KS equilibrium
+#' ################################################################
+#'
+#' # Grid definition: simple lhs
+#' integcontrol=list(n.s=1e4, gridtype='lhs')
+#'
+#' # Run solver with 20 initial points, 4 iterations
+#' # Increase n.ite to at least 20 for better results
+#' res <- solve_game(fun2, equilibrium = "KSE", crit = "sur", n.init=20, n.ite=2,
+#'                   d = 4, nobj=2,
+#'                   integcontrol=integcontrol,
+#'                   filtercontrol=filtercontrol,
+#'                   kmcontrol=kmcontrol,
+#'                   ncores = 1, trace=1, seed=1)
+#'
+#' # Get estimated equilibrium and corresponding pay-off
+#' NE <- res$Eq.design
+#' Poff <- res$Eq.poff
+#'
+#' # Draw results
+#' plotGame(res, equilibrium = "KSE")
+#' }
 
 solve_game <- function(
   fun, ..., equilibrium="NE", crit="sur", model=NULL, n.init=NULL, n.ite, d, nobj, x.to.obj=NULL, noise.var = NULL,
-  Nadir=NULL, integcontrol=NULL, simucontrol=NULL, filtercontrol=NULL, kmcontrol=NULL, returncontrol=NULL,
-  ncores=1, trace=1, seed=NULL) {
+  Nadir=NULL, Shadow=NULL, integcontrol=NULL, simucontrol=NULL, filtercontrol=NULL, kmcontrol=NULL, returncontrol=NULL,
+  ncores=1, trace=1, seed=NULL, calibcontrol=NULL, freq.exploit=1e3) {
   
   t1 <- Sys.time()
   set.seed(seed)
@@ -230,7 +234,7 @@ solve_game <- function(
   # Check critcontrols
   if (crit == 'pex') PnashMethod <- 'exact' else PnashMethod <- 'simu'
   if (crit %in% c('psim', 'pex') && equilibrium!="NE"){
-    cat("pex and psim available only for Nash equilibria; crit switched to sur \n")
+    warning("pex and psim available only for Nash equilibria; crit switched to sur \n")
     crit <- "sur"
   }
   
@@ -238,6 +242,7 @@ solve_game <- function(
   integ.pts <- integcontrol$integ.pts
   expanded.indices <- integcontrol$expanded.indices
   n.s <- integcontrol$n.s
+  init_set <- integcontrol$init_set
   gridtype <- switch(1+is.null(integcontrol$gridtype), integcontrol$gridtype, "lhs")
   lb <- switch(1+is.null(integcontrol$lb), integcontrol$lb, rep(0, d))
   ub <- switch(1+is.null(integcontrol$ub), integcontrol$ub, rep(1, d))
@@ -245,7 +250,7 @@ solve_game <- function(
   integcontrol$kweights <- switch(1+is.null(integcontrol$kweights), integcontrol$kweights, FALSE)
   integcontrol$nsamp <- switch(1+is.null(integcontrol$nsamp), integcontrol$nsamp, 1e4)
   if (equilibrium %in% c("NE", "NKSE") && integcontrol$renew) {
-    cat("integcontrol$renew=TRUE only available for KSE and CKSE \n")
+    warning("integcontrol$renew=TRUE only available for KSE and CKSE \n")
     integcontrol$renew <- FALSE
   }
   
@@ -264,8 +269,11 @@ solve_game <- function(
   ncandPoints <- switch(1+is.null(filtercontrol$ncandPoints), filtercontrol$ncandPoints, 200)
   filtercontrol$nsamp <- switch(1+is.null(filtercontrol$nsamp), filtercontrol$nsamp, max(20, 5* nobj))
   
+  # Temporary warning: Check renew is possible
+  if(integcontrol$renew && all(filtercontrol$filter == "none")) warning("Renew does not work yet with no filters. \n")
+  
   if (equilibrium %in% c("KSE", "CKSE") && "Pnash" %in% filter) {
-    cat("Pnash filter only available for NE; switching to PND \n")
+    warning("Pnash filter only available for NE; switching to PND \n")
     filter[which(filter=="Pnash")] <- 'PND'
   }
   simu.filter <- filter[1]
@@ -284,12 +292,12 @@ solve_game <- function(
   if (!is.null(returncontrol$track.Eq)) track.Eq <- returncontrol$track.Eq else track.Eq <- 'none'
   if(is.null(returncontrol$force.exploit.last)) returncontrol$force.exploit.last <- TRUE
   if (equilibrium %in% c("KSE", "CKSE") && track.Eq %in% c("psim", "pex")) {
-    cat("track.Eq must be set to none, mean or empirical for KSE - switching to empirical \n")
+    warning("track.Eq must be set to none, mean or empirical for KSE - switching to empirical \n")
     track.Eq <- "empirical"
   } 
   if (equilibrium %in% c("NE", "NKSE") && track.Eq == "empirical") {
     # Pnash case
-    cat("track.Eq= empirical option only available for KSE and CKSE; switching to psim \n")
+    warning("track.Eq= empirical option only available for KSE and CKSE; switching to psim \n")
     track.Eq <- "psim"
   }
   
@@ -298,6 +306,15 @@ solve_game <- function(
     if (typeof(noise.var) == "closure") noise.var <- match.fun(noise.var)
     else if (typeof(noise.var) == "double" && length(noise.var==1)) noise.var <- rep(noise.var, nobj)
     kmnugget <- NULL
+  }
+  
+  # Check calibcontrol
+  if (!is.null(calibcontrol)) {
+    if (is.null(calibcontrol$target)){
+      stop("calibcontrol should contain a target vector \n")
+    } 
+    if (is.null(calibcontrol$log)) calibcontrol$log <- FALSE
+    if (is.null(calibcontrol$offset)) calibcontrol$offset <- 0
   }
   
   if (trace>0) cat("--------------------------\n Starting", equilibrium, "search with:", "\n",
@@ -316,6 +333,7 @@ solve_game <- function(
   Eq.design.estimate <- Eq.poff.estimate <- trackPnash <- NULL
   predEq <- list()
   include.obs <- FALSE
+  all_simPoints <- c()
   
   #### Initial design and models ####################
   if (is.null(model)){
@@ -374,10 +392,10 @@ solve_game <- function(
   #### MAIN LOOP STARTS HERE #########################################################################
   ####################################################################################################
   Jnres <- rep(NA, n.ite + 1)
-  
+
   for (ii in 1:(n.ite+1)){
     if (ii < (n.ite+1) && trace>0){cat("--- Iteration #", ii, " ---\n")}else{
-      if(trace>0){cat}("--- Post-processing ---\n")
+      if(trace>0){cat("--- Post-processing ---\n")}
     }
     t0 <- t1 <- Sys.time()
     
@@ -386,11 +404,15 @@ solve_game <- function(
     # RENEW INTEGRATION POINTS
     ##################################################################
     if (ii > 1 && integcontrol$renew) {
+      all_simPoints <- unique(rbind(all_simPoints, as.matrix(my.integ.pts)))
+      # print(str(all_simPoints))
       include.obs <- equilibrium %in% c("KSE", "CKSE")
       res <- generate_integ_pts(n.s=n.s, d=d, nobj=nobj, x.to.obj=x.to.obj, equilibrium=equilibrium,
-                                gridtype=gridtype, lb = lb, ub = ub, include.obs=include.obs, model=model, seed=ii)
+                                gridtype=gridtype, lb = lb, ub = ub, include.obs=include.obs, model=model, 
+                                init_set=init_set, include_set=all_simPoints, seed=ii)
       integcontrol$integ.pts <- integ.pts <- res$integ.pts
       integcontrol$expanded.indices <- expanded.indices <- res$expanded.indices
+      # print(str(integcontrol$integ.pts))
     }
     ##################################################################
     # MODELS UPDATE
@@ -415,14 +437,14 @@ solve_game <- function(
       
       for (u in 1:nobj){
         if (typeof(newmodel[[u]]) == "character" && cov.reestim) {
-          cat("Error in hyperparameter estimation - old hyperparameter values used instead for model ", u, "\n")
+          if(trace > 0) cat("Error in hyperparameter estimation - old hyperparameter values used instead for model ", u, "\n")
           newmodel[[u]] <- try(update(object = model[[u]], newX = X.new, newy=ynew[u], newnoise.var = newnoise.var[u],
                                       newX.alreadyExist=FALSE, cov.reestim = FALSE), silent = TRUE)
         }
         if (typeof(newmodel[[u]]) == "character") {
-          cat("Unable to udpate kriging model ", u, " at iteration", ii-1, "- optimization stopped \n")
-          cat("lastmodel ", u, " is the model at iteration", ii-1, "\n")
-          cat("par and values contain the ",ii , "th observation \n \n")
+          if(trace > 0) cat("Unable to udpate kriging model ", u, " at iteration", ii-1, "- optimization stopped \n")
+          if(trace > 0) cat("lastmodel ", u, " is the model at iteration", ii-1, "\n")
+          if(trace > 0) cat("par and values contain the ",ii , "th observation \n \n")
           # if (ii > 1) allX.new <- rbind(model[[u]]@X[(model[[u]]@n + 1):(model[[u]]@n+ii-1),, drop=FALSE], X.new)
           return(list(
             par    = X.new,
@@ -473,20 +495,37 @@ solve_game <- function(
       if (is.null(window) || crit != "sur") {
         # Special case for initialization - otherwise do not change the old "window" value
         predmean <- Reduce(cbind, lapply(pred, function(alist) alist$mean))
-        Eq_simu <- getEquilibrium(Z = predmean,  equilibrium = equilibrium, nobj = nobj, expanded.indices=expanded.indices,
-                                  n.s=n.s, sorted = sorted, cross = cross, kweights = NULL, Nadir=Nadir)#, NSobs = NSobs)
-        if(nrow(Eq_simu) < 1 || all(is.na(Eq_simu))){
-          ## if no window has been defined in previous iterations, use the mean, otherwise keep the old one
-          if(is.null(window)){
-            window <- colMeans(observations)
+        if (!is.null(calibcontrol$target)) {
+          # Calibration mode
+          predmean <- (predmean - matrix(rep(calibcontrol$target, nrow(predmean)), byrow=TRUE, nrow=nrow(predmean)))^2
+          if (calibcontrol$log) {
+            predmean <- log(predmean + calibcontrol$offset)
           }
-        } else if(nrow(Eq_simu) == 1) {
+        }
+        Eq_simu <- getEquilibrium(Z = predmean,  equilibrium = equilibrium, nobj = nobj, expanded.indices=expanded.indices,
+                                  n.s=n.s, sorted = sorted, cross = cross, kweights = NULL, Nadir=Nadir, Shadow=Shadow)#, NSobs = NSobs)
+        
+        if(nrow(Eq_simu) < 1 || all(is.na(Eq_simu))) {
+          ## if no window has been defined in previous iterations, use the mean, otherwise keep the old one
+          if (is.null(window)){
+            window <- colMeans(observations)
+            if (!is.null(calibcontrol$target)) {
+              window <- (window - calibcontrol$target)^2
+            }
+          } 
+        } else if (nrow(Eq_simu) == 1) {
           window <- as.vector(Eq_simu)
         } else {
           window <- colMeans(Eq_simu, na.rm = TRUE)
         }
+        
+        if (!is.null(calibcontrol$target)) { 
+          if (calibcontrol$log){
+            window <- exp(window) - calibcontrol$offset
+          }
+        }
+        options <- list(window = window)
       }
-      options <- list(window = window)
     } else if (simu.filter == "Pnash") {
       options <- list(method=PnashMethod, nsim=100)
     }
@@ -498,42 +537,12 @@ solve_game <- function(
       
       filt <- filter_for_Game(n.s.target = pmin(n.s, round(nsimPoints^(1/length(n.s)))), integcontrol=integcontrol,
                               model = model, predictions=pred, type=simu.filter, options = options, random=randomFilter[1],
-                              include.obs=TRUE, ncores = ncores, equilibrium=equilibrium, nsamp=filtercontrol$nsamp, Nadir=Nadir)
+                              include.obs=TRUE, ncores = ncores, equilibrium=equilibrium, nsamp=filtercontrol$nsamp, Nadir=Nadir, 
+                              target=calibcontrol$target)
       I <- filt$I
     } else {
       I <- 1:nrow(integ.pts)
     }
-    
-    # ## Add potential minimas of each objective based on EI, and EI x Pdom
-    # if (equilibrium == "KSE" && simu.filter != 'none'){
-    #   IKS <- NULL # points of interest for KS (i.e., related to KS and Nadir)
-    #   
-    #   ## EI on each objective
-    #   for (jj in 1:nobj) {
-    #     # Based on DiceOptim
-    #     xcr <-  (min(model[[jj]]@y) - pred[[jj]]$mean)/pred[[jj]]$sd
-    #     test <- (min(model[[jj]]@y) - pred[[jj]]$mean)*pnorm(xcr) + pred[[jj]]$sd * dnorm(xcr)
-    #     test[which(pred[[jj]]$sd/sqrt(model[[jj]]@covariance@sd2) < 1e-06)] <- NA
-    #     IKS <- c(IKS, which.max(test))
-    #   }
-    #   
-    #   ## EI x Pdom on each objective (to find potential Nadir points)
-    #   PNDom <- prob.of.non.domination(paretoFront = PFobs,
-    #                                   model = model, integration.points = integ.pts, predictions = pred,
-    #                                   nsamp = filtercontrol$nsamp)
-    #   for (jj in 1:nobj) {
-    #     # Based on DiceOptim
-    #     xcr <-  -(max(PFobs[,jj]) - pred[[jj]]$mean)/pred[[jj]]$sd
-    #     test <- (-max(PFobs[,jj]) + pred[[jj]]$mean)*pnorm(xcr) + pred[[jj]]$sd * dnorm(xcr)
-    #     test[which(pred[[jj]]$sd/sqrt(model[[jj]]@covariance@sd2) < 1e-06)] <- NA
-    #     test <- test * PNDom
-    #     IKS <- c(IKS, which.max(test))
-    #   }
-    #   
-    #   I <- unique(c(I, IKS))
-    # } else {
-    #   IKS <- NULL
-    # }
     
     my.integ.pts <- integ.pts[I,]
     my.expanded.indices <- expanded.indices[I,]
@@ -544,21 +553,7 @@ solve_game <- function(
     } else {
       my.n.s <- apply(my.expanded.indices, 2, function(x) length(unique(x)))
     }
-    
-    if (equilibrium == "CKSE" && integcontrol$kweights){
-      Xsamp <- matrix(runif(d * integcontrol$nsamp), integcontrol$nsamp)
-      kweights <- list()
-      for(u in 1:nobj){
-        kn <- covMat1Mat2(model[[u]]@covariance, Xsamp, my.integ.pts)
-        Knn <- try(chol2inv(chol(covMat1Mat2(model[[u]]@covariance, my.integ.pts, my.integ.pts) + diag(1e-6, nrow(my.integ.pts)))))
-        if (typeof(Knn)== "character") {
-          cat("Unable to compute kweights, last model returned \n")
-          return(list(model=model, predEq=predEq, integcontrol=integcontrol))
-        }
-        kweights <- c(kweights, list(list(kn = kn, Knn = Knn)))
-      }
-    } else {kweights = NULL}
-    
+
     if (trace>1) cat("Number of strategies after simu filtering: (", my.n.s, ")\n")
     
     my.expanded.indices2 <- my.expanded.indices
@@ -576,6 +571,23 @@ solve_game <- function(
     if (trace>2) cat("Time for filter 1 (simu): ", t2, units(t2), "\n")
     t1 <- Sys.time()
     
+    if (equilibrium == "CKSE" && integcontrol$kweights){
+      Xsamp <- matrix(runif(d * integcontrol$nsamp), integcontrol$nsamp)
+      kweights <- list()
+      for(u in 1:nobj){
+        kn <- covMat1Mat2(model[[u]]@covariance, Xsamp, my.integ.pts)
+        Knn <- try(chol2inv(chol(covMat1Mat2(model[[u]]@covariance, my.integ.pts, my.integ.pts) + diag(1e-6, nrow(my.integ.pts)))))
+        if (typeof(Knn)== "character") {
+          warning("Unable to compute kweights, last model returned \n")
+          return(list(model=model, predEq=predEq, integcontrol=integcontrol))
+        }
+        kweights <- c(kweights, list(kn %*% Knn))
+      }
+      t2 <- Sys.time() - t1
+      if (trace>2) cat("Time for kweights: ", t2, units(t2), "\n")
+      t1 <- Sys.time()
+    } else {kweights = NULL}
+    
     ##################################################################
     # Precalculations and simulations (if not performed already)
     ##################################################################
@@ -590,7 +602,7 @@ solve_game <- function(
                                                    cond=TRUE, checkNames=FALSE, nugget.sim = 10^-6, mc.cores=ncores))))
       
       if (typeof(current.simu)== "character") {
-        cat("Unable to compute GP draws, last model returned \n")
+        warning("Unable to compute GP draws, last model returned \n")
         return(list(model=model, predEq=predEq, integcontrol=integcontrol))
       } else {
         my.Simu[index.other,] <- current.simu
@@ -611,14 +623,31 @@ solve_game <- function(
     ##################################################################
     cand.pts <- my.integ.pts
     if ((simu.filter == "window" && crit == 'sur') || cand.filter == "window") {
-      Eq_simu <- getEquilibrium(my.Simu, equilibrium = equilibrium, nobj = nobj, expanded.indices=my.expanded.indices,
-                                n.s=my.n.s, sorted = sorted, cross = cross, kweights = kweights, Nadir=Nadir)
+      
+      if (!is.null(calibcontrol$target)) {
+        # Calibration mode
+        Target <- rep(calibcontrol$target, each=n.sim)
+        my.Simu2 <- (my.Simu - matrix(rep(Target, nrow(my.Simu)), byrow=TRUE, nrow=nrow(my.Simu)))^2
+        if (calibcontrol$log) {
+          my.Simu2 <- log(my.Simu2 + calibcontrol$offset)
+        }
+        calibcontrol$Y <- my.Simu
+      } else {
+        my.Simu2 <- my.Simu
+      }
+      
+      Eq_simu <- getEquilibrium(my.Simu2, equilibrium = equilibrium, nobj = nobj, expanded.indices=my.expanded.indices,
+                                n.s=my.n.s, sorted = sorted, cross = cross, kweights = kweights, Nadir=Nadir, Shadow=Shadow,
+                                calibcontrol=calibcontrol)
       # ,NSobs = matrix(do.call("rbind", rep(list(NSobs), n.sim)), nrow=nrow(NSobs)))
       Eq_simu <- Eq_simu[which(!is.na(Eq_simu[,1])),, drop = FALSE]
       Jnres[ii] <- determinant(cov(Eq_simu), logarithm = TRUE)[[1]][1]
       temp <- apply(Eq_simu, 2, range, na.rm = TRUE)
       
       if (!any(is.na(temp))) window <- temp
+      
+      if (!is.null(calibcontrol$target)) if (calibcontrol$log)   window <- exp(window) - calibcontrol$offset
+      
       options <- list(window = window)
     } else if (cand.filter == "Pnash") {
       options <- list(method=PnashMethod, nsim = 100)
@@ -640,15 +669,11 @@ solve_game <- function(
         J <- filter_for_Game(n.s.target = pmin(my.n.s, round(ncandPoints^(1/length(my.n.s)))), integcontrol=my.integcontrol,
                              model = model, predictions=my.pred, type=cand.filter, options = options,
                              random=randomFilter[2], include.obs=FALSE, ncores = ncores, 
-                             equilibrium=equilibrium, nsamp=filtercontrol$nsamp, Nadir=Nadir)$I
+                             equilibrium=equilibrium, nsamp=filtercontrol$nsamp, Nadir=Nadir, Shadow=Shadow, target=calibcontrol$target)$I
       }
     }
-    
-    # ## Add extremal points for KSE / CKSE
-    # if(!is.null(IKS)){
-    #   J <- unique(c(J, which(I %in% IKS)))
-    # }
-    
+    # print("J")
+    # print(str(J))
     ## Remove already evaluated designs from candidates
     if((ii > 1) && (ii<(n.ite+1))){
       my.pred.s <- my.pred[[1]]$sd[J]
@@ -671,15 +696,22 @@ solve_game <- function(
       
       ## Special treatment to force exploration on last iteration
       FailToExploit <- TRUE
-      if (ii == n.ite && returncontrol$force.exploit.last) {
+      if (((ii == n.ite) && returncontrol$force.exploit.last) || ((ii %% freq.exploit == 0) && (ii > 1))) {
         if (equilibrium %in% c("KSE", "CKSE")) {
           predmean <- Reduce(cbind, lapply(pred, function(alist) alist$mean))
+          if (!is.null(calibcontrol$target)) {
+            # Calibration mode
+            predmean <- (predmean - matrix(rep(calibcontrol$target, nrow(predmean)), byrow=TRUE, nrow=nrow(predmean)))^2
+            if (calibcontrol$log) {
+              predmean <- log(predmean + calibcontrol$offset)
+            }
+          }
           currentEq <- try(getEquilibrium(Z = predmean,  equilibrium = equilibrium, nobj = nobj,
                                           expanded.indices=expanded.indices, n.s=n.s, kweights = NULL,
-                                          sorted = sorted, cross = cross, return.design = TRUE, Nadir=Nadir)) #, NSobs = NSobs)
+                                          sorted = sorted, cross = cross, return.design = TRUE, Nadir=Nadir, Shadow=Shadow)) #, NSobs = NSobs)
           
           if (typeof(currentEq)== "character") {
-            cat("Unable to compute exploitation step, last model returned \n")
+            warning("Unable to compute exploitation step, last model returned \n")
             return(list(model=model, predEq=predEq, integcontrol=integcontrol))
           }
           
@@ -698,7 +730,7 @@ solve_game <- function(
           Jplus <- try(unlist(mclapply(X=J, FUN=crit_SUR_Eq, model=model, integcontrol=my.integcontrol,
                                        Simu=my.Simu, equilibrium = equilibrium, precalc.data=precalc.data,
                                        n.ynew=n.ynew, IS=IS, cross=cross, kweights = kweights,
-                                       mc.cores = ncores, Nadir=Nadir)))
+                                       mc.cores = ncores, Nadir=Nadir, Shadow=Shadow, calibcontrol=calibcontrol)))
         } else if (crit == 'pex') {
           Jplus <- try(-crit_PNash(idx=J, integcontrol=my.integcontrol,
                                    type = 'exact', model = model, ncores = ncores))
@@ -707,11 +739,11 @@ solve_game <- function(
                                    type = 'simu', model = model, ncores = ncores, control = list(nsim = 100)))
         }
         if (typeof(Jplus)== "character") {
-          cat("Unable to optimize criterion, last model returned \n")
+          warning("Unable to optimize criterion, last model returned \n")
           return(list(model=model, predEq=predEq, integcontrol=integcontrol))
         }
         if (all(is.na(Jplus))){
-          cat("No equilibrium found - last model returned \n")
+          warning("No equilibrium found - last model returned \n")
           return(list(model = model, predEq=predEq, Jplus = Jplus, integcontrol=integcontrol))
         }
         Jplus[is.na(Jplus)] <- max(Jplus, na.rm = TRUE)
@@ -731,9 +763,9 @@ solve_game <- function(
       ynew <- try(fun(xnew, ...))
       
       if (typeof(ynew) == "character" ) {
-        cat("Unable to compute objective function at iteration ", i, "- optimization stopped \n")
-        cat("Problem occured for the design: ", xnew, "\n")
-        cat("Last model and problematic design (xnew) returned \n")
+        if(trace > 0) cat("Unable to compute objective function at iteration ", i, "- optimization stopped \n")
+        if(trace > 0) cat("Problem occured for the design: ", xnew, "\n")
+        warning("Last model and problematic design (xnew) returned \n")
         return(list(model=model, predEq=predEq, integcontrol=integcontrol, xnew=xnew))
       }
       
@@ -769,8 +801,16 @@ solve_game <- function(
       
       if (track.Eq == "empirical") {
         observations <- Reduce(cbind, lapply(model, slot, "y"))
-        currentEq <- try(getEquilibrium(Z=observations, equilibrium = equilibrium, nobj=nobj,
-                                        return.design=TRUE, cross=cross, kweights = kweights, Nadir=Nadir))
+        if (!is.null(calibcontrol$target)) {
+          observations2 <- (observations - matrix(rep(calibcontrol$target, nrow(observations)), byrow=TRUE, nrow=nrow(observations)))^2
+          if (calibcontrol$log) {
+            observations2 <- log(observations2 + calibcontrol$offset)
+          }
+          calibcontrol$Y <- observations
+        }
+        
+        currentEq <- try(getEquilibrium(Z=observations2, equilibrium = equilibrium, nobj=nobj,
+                                        return.design=TRUE, cross=cross, kweights = kweights, Nadir=Nadir, Shadow=Shadow, calibcontrol=calibcontrol))
         
       } else if (track.Eq %in% c("psim", "pex")) {
         
@@ -795,9 +835,16 @@ solve_game <- function(
       } else {
         ## Eq of the GP predictive means
         predmean <- Reduce(cbind, lapply(pred, function(alist) alist$mean))
+        if (!is.null(calibcontrol$target)) {
+          # Calibration mode
+          predmean <- (predmean - matrix(rep(calibcontrol$target, nrow(predmean)), byrow=TRUE, nrow=nrow(predmean)))^2
+          if (calibcontrol$log) {
+            predmean <- log(predmean + calibcontrol$offset)
+          }
+        }
         currentEq <- try(getEquilibrium(Z = predmean,  equilibrium = equilibrium, nobj = nobj,
                                         expanded.indices=expanded.indices, n.s=n.s, kweights = NULL,
-                                        sorted = sorted, cross = cross, return.design = T, Nadir=Nadir)) #, NSobs = NSobs)
+                                        sorted = sorted, cross = cross, return.design = T, Nadir=Nadir, Shadow=Shadow)) #, NSobs = NSobs)
       }
       predEq <- c(predEq, list(currentEq))
       
@@ -820,3 +867,34 @@ solve_game <- function(
               Jplus = all.Jplus, integcontrol=integcontrol, predEq = predEq))
   
 }
+
+#' Wrapper around \code{\link[GPGame]{solve_game}} to add iterations to an existing run
+#' @title Restart existing run
+#' @param results output of \code{\link[GPGame]{solve_game}} that is to be continued
+#' @param fun fonction with vectorial output
+#' @param ... additional parameter to be passed to fun
+#' @param equilibrium either '\code{NE}', '\code{KSE}', '\code{CKSE}' or '\code{NKSE}' for Nash / Kalai-Smorodinsky / Copula-Kalai-Smorodinsky / Nash-Kalai-Smorodinsky equilibria
+#' @param crit '\code{sur}' (default) is available for all equilibria, '\code{psim}' and '\code{pex}' are available for Nash
+#' @param n.ite number of additional iterations of sequential optimization
+#' @param x.to.obj for NE and NKSE, which variables for which objective
+#' @param noise.var noise variance. Either a scalar (same noise for all objectives), a vector (constant noise, different for each objective), a function (type closure) with vectorial output (variable noise, different for each objective) or "given_by_fn", see Details. If not provided, noise.var is taken as the average of model@noise.var.
+#' @param Nadir,Shadow	optional vectors of size nobj. Replaces the nadir or shadow point for KSE. If only a subset of values needs to be defined, the other coordinates can be set to Inf (resp. -Inf for the shadow).
+#' @param integcontrol optional list for handling integration points. See Details.
+#' @param simucontrol,filtercontrol,kmcontrol,returncontrol see \code{\link[GPGame]{solve_game}}
+#' @param ncores	number of CPU available (> 1 makes mean parallel TRUE)
+#' @param trace controls the level of printing: 0 (no printing), 1 (minimal printing), 3 (detailed printing)
+#' @param seed to fix the random variable generator
+#' @return See \code{\link[GPGame]{solve_game}}.
+#' @details 
+#' Unless given new values, restart_sg reuses values stored in results (e.g., \code{integcontrol}).
+#' @note For beta testing, this function could evolve.
+restart_sg <- function(results, fun, ..., equilibrium="NE", crit="sur", n.ite, x.to.obj=NULL, noise.var = NULL,
+                       Nadir=NULL, Shadow=NULL, integcontrol=NULL, simucontrol=NULL, filtercontrol=NULL, kmcontrol=NULL, returncontrol=NULL,
+                       ncores=1, trace=1, seed=NULL){
+  new_result <- solve_game(fun = fun, ... = ..., equilibrium = equilibrium, crit = crit, model = results$model,
+                           n.ite = n.ite, d = results$model[[1]]@d, nobj = length(results$model), x.to.obj = x.to.obj, Nadir = Nadir, Shadow=Shadow, 
+                           integcontrol = results$integcontrol, simucontrol = simucontrol, kmcontrol = kmcontrol,
+                           filtercontrol = filtercontrol, ncores = ncores, trace = trace, seed = seed)
+  new_result$Jplus <- c(results$Jplus, new_result$Jplus)
+}
+

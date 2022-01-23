@@ -4,9 +4,22 @@
 \alias{crit_SUR_Eq}
 \title{SUR criterion for equilibria}
 \usage{
-crit_SUR_Eq(idx, model, integcontrol, Simu, precalc.data = NULL, equilibrium,
-  n.ynew = NULL, cross = FALSE, IS = FALSE, plot = FALSE,
-  kweights = NULL, Nadir = NULL)
+crit_SUR_Eq(
+  idx,
+  model,
+  integcontrol,
+  Simu,
+  precalc.data = NULL,
+  equilibrium,
+  n.ynew = NULL,
+  cross = FALSE,
+  IS = FALSE,
+  plot = FALSE,
+  kweights = NULL,
+  Nadir = NULL,
+  Shadow = NULL,
+  calibcontrol = NULL
+)
 }
 \arguments{
 \item{idx}{is the index on the grid of the strategy evaluated}
@@ -36,15 +49,21 @@ for faster computation - computed if not provided}
 
 \item{kweights}{kriging weights for \code{CKS} (TESTING)}
 
-\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined,
-the other coordinates can be set to \code{Inf}.}
+\item{Nadir, Shadow}{optional vectors of size \code{nobj}. Replaces the nadir or shadow point for \code{KSE}. If only a subset of values needs to be defined, 
+the other coordinates can be set to \code{Inf} (resp. -\code{Inf} for the shadow).}
+
+\item{calibcontrol}{an optional list for calibration problems, containing \code{target} a vector of target values for the objectives, 
+\code{log} a Boolean stating if a log transformation should be used or not aand , and \code{offset} a (small) scalar so that each objective is log(offset + (y-T^2)).}
+}
+\value{
+Criterion value.
 }
 \description{
 Computes the SUR criterion associated to an equilibrium for a given \code{xnew} and a set of trajectories of objective functions
 on a predefined grid.
 }
 \examples{
-\dontrun{
+\donttest{
 ##############################################
 # 2 variables, 2 players
 ##############################################
@@ -82,14 +101,15 @@ model <- list(mf1, mf2)
 Simu <- t(Reduce(rbind, lapply(model, simulate, nsim=10, newdata=integ.pts, cond=TRUE,
                                    checkNames=FALSE, nugget.sim = 10^-8)))
 
-# Useful precalculations
-library(KrigInv)
-precalc.data <- lapply(model, FUN=KrigInv:::precomputeUpdateData, integration.points=integ.pts)
+# Useful precalculations with the package KrigInv can be reused for computational speed.
+# library(KrigInv)
+# precalc.data <- lapply(model, FUN=KrigInv:::precomputeUpdateData, integration.points=integ.pts)
 
 # Compute criterion for all points on the grid
 crit_grid <- lapply(X=1:prod(n.s), FUN=crit_SUR_Eq, model=model,
                     integcontrol=integcontrol, equilibrium = "NE",
-                    Simu=Simu, precalc.data=precalc.data, n.ynew=10, IS=FALSE, cross=FALSE)
+                    # precalc.data=precalc.data, # Uncomment if precalc.data is computed
+                    Simu=Simu, n.ynew=10, IS=FALSE, cross=FALSE)
 crit_grid <- unlist(crit_grid)
 
 # Draw contour of the criterion

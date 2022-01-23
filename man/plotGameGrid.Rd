@@ -4,10 +4,20 @@
 \alias{plotGameGrid}
 \title{Visualisation of equilibrium solution in input/output space}
 \usage{
-plotGameGrid(fun = NULL, domain = NULL, n.grid, graphs = c("both",
-  "design", "objective"), x.to.obj = NULL, integcontrol = NULL,
-  equilibrium = c("NE", "KSE", "CKSE", "NKSE"), fun.grid = NULL,
-  Nadir = NULL, ...)
+plotGameGrid(
+  fun = NULL,
+  domain = NULL,
+  n.grid,
+  graphs = c("both", "design", "objective"),
+  x.to.obj = NULL,
+  integcontrol = NULL,
+  equilibrium = c("NE", "KSE", "CKSE", "NKSE"),
+  fun.grid = NULL,
+  Nadir = NULL,
+  Shadow = NULL,
+  calibcontrol = NULL,
+  ...
+)
 }
 \arguments{
 \item{fun}{name of the function considered}
@@ -24,8 +34,12 @@ plotGameGrid(fun = NULL, domain = NULL, n.grid, graphs = c("both",
 
 \item{fun.grid}{optional matrix containing the values of \code{fun} at \code{integ.pts}. Computed if not provided.}
 
-\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
-the other coordinates can be set to \code{Inf}.}
+\item{Nadir, Shadow}{optional vectors of size \code{nobj}. Replaces the nadir point for \code{KSE}. If only a subset of values needs to be defined, 
+the other coordinates can be set to \code{Inf} (resp. \code{-Inf}.}
+
+\item{calibcontrol}{an optional list for calibration problems, containing \code{target} a vector of target values for the objectives, 
+\code{log} a Boolean stating if a log transformation should be used or not and 
+\code{offset} a (small) scalar so that each objective is log(offset + (y-T^2)).}
 
 \item{...}{further arguments to \code{fun}}
 }
@@ -43,7 +57,7 @@ list returned by invisible() with elements:
 Plot equilibrium for 2 objectives test problems with evaluations on a grid. The number of variables is not limited.
 }
 \examples{
-\dontrun{
+\donttest{
 library(GPareto)
 
 ## 2 variables

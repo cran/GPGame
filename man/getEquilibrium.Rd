@@ -4,9 +4,20 @@
 \alias{getEquilibrium}
 \title{Equilibrium computation of a discrete game for a given matrix with objectives values}
 \usage{
-getEquilibrium(Z, equilibrium = c("NE", "NKSE", "KSE", "CKSE"), nobj = 2,
-  n.s, expanded.indices = NULL, return.design = FALSE, sorted = FALSE,
-  cross = FALSE, kweights = NULL, Nadir = NULL)
+getEquilibrium(
+  Z,
+  equilibrium = c("NE", "NKSE", "KSE", "CKSE"),
+  nobj = 2,
+  n.s,
+  expanded.indices = NULL,
+  return.design = FALSE,
+  sorted = FALSE,
+  cross = FALSE,
+  kweights = NULL,
+  Nadir = NULL,
+  Shadow = NULL,
+  calibcontrol = NULL
+)
 }
 \arguments{
 \item{Z}{is a matrix of size [\code{npts x nsim*nobj}] of objective values, see details,}
@@ -24,11 +35,22 @@ otherwise number of strategies per player.}
 
 \item{sorted}{Boolean; if \code{TRUE}, the last column of expanded.indices is assumed to be sorted in increasing order. This provides a substantial efficiency gain.}
 
-\item{cross}{Should the simulation be crossed? (May be dropped in future versions)}
+\item{cross}{Should the simulation be crossed? (For "NE" only - may be dropped in future versions)}
 
 \item{kweights}{kriging weights for \code{CKS} (TESTING)}
 
-\item{Nadir}{optional vector of size \code{nobj}. Replaces the nadir point for \code{KSE}. Some coordinates can be set to NULL.}
+\item{Nadir, Shadow}{optional vectors of size \code{nobj}. Replaces the nadir and/or shadow point for \code{KSE}. Some coordinates can be set to \code{Inf} (resp. -\code{Inf}).}
+
+\item{calibcontrol}{an optional list for calibration problems, containing \code{target} a vector of target values for the objectives, 
+\code{log} a Boolean stating if a log transformation should be used or not and 
+\code{offset} a (small) scalar so that each objective is log(offset + (y-T^2)).}
+}
+\value{
+A list with elements:
+\itemize{
+\item \code{NEPoff} vector of pay-offs at the equilibrium or matrix of pay-offs at the equilibria;
+\item \code{NE} the corresponding design(s), if \code{return.design} is \code{TRUE}.
+}
 }
 \description{
 Computes the equilibrium of three types of games, given a matrix of objectives (or a set of matrices) and the structure of the strategy space.
@@ -39,7 +61,7 @@ The position of the strategy \code{s} in the grid is given by the corresponding 
 different trajectories for each pay-off: each line is [obj1_1(x), obj1_2(x), ... obj2_1(x), obj2_2(x), ...].
 }
 \examples{
-\dontrun{
+\donttest{
 ## Setup
 fun <- function (x)
 {
@@ -78,7 +100,7 @@ print(integ.pts[trueEq$NE,])
 print(expanded.indices[trueEq$NE,])
 
 # Plots
-par(mfrow = c(1,2))
+oldpar <- par(mfrow = c(1,2))
 plotGameGrid(fun = fun, n.grid = n.s, x.to.obj = x.to.obj, integcontrol=integcontrol,
              equilibrium = "NE")
 
@@ -112,5 +134,6 @@ print(expanded.indices[trueNKSEq$NE,])
 # Plots
 plotGameGrid(fun = fun, n.grid = n.s, x.to.obj = x.to.obj, integcontrol=integcontrol,
              equilibrium = "NKSE")
+par(oldpar)
 }
 }
